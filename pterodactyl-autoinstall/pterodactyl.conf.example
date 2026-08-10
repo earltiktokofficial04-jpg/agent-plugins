@@ -1,68 +1,64 @@
 #############################################################################
 #                                                                           #
-#   PTERODACTYL AUTO-INSTALLER — FAIL KONFIGURASI                           #
+#   PTERODACTYL AUTO-INSTALLER — FAIL CONFIG (OPSIONAL)                     #
 #                                                                           #
-#   Isi bahagian WAJIB. Bahagian OPSIONAL boleh biar kosong ("") —          #
-#   script akan guna nilai default yang tertera dalam komen.                #
+#   KAU TIDAK PERLUKAN FAIL INI untuk pemasangan biasa.                     #
+#   Jalankan `sudo ./install.sh` sahaja — ia akan tanya beberapa soalan      #
+#   dan mengesan yang lain sendiri.                                          #
+#                                                                           #
+#   Fail ini untuk pemasangan tanpa pengawasan (CI, banyak server):          #
+#       sudo ./install.sh --config pterodactyl.conf --non-interactive        #
+#                                                                           #
+#   Hanya PANEL_FQDN dan ADMIN_EMAIL yang benar-benar wajib. Semua yang      #
+#   lain ada default atau dikesan automatik — biar kosong kalau tak pasti.   #
 #                                                                           #
 #   Format: KEY="value"  — jangan buang tanda petik.                        #
-#   Jalankan `./install.sh --validate-only` untuk semak tanpa install.      #
+#   Semak tanpa memasang:  sudo ./install.sh --config <fail> --dry-run       #
 #                                                                           #
 #############################################################################
 
 
 #============================================================================
-#  BAHAGIAN 1 — WAJIB
-#  Script akan BERHENTI dan senaraikan semua yang kosong/salah.
+#  WAJIB
 #============================================================================
 
 # WAJIB. Domain atau IP untuk akses panel. Contoh: "panel.domain.com" atau "203.0.113.10"
-# Kalau guna SSL, ini MESTI domain sebenar yang dah point ke server ni (bukan IP).
+# Domain diperlukan kalau kau mahu HTTPS; IP tidak boleh dapat sijil Let's Encrypt.
 PANEL_FQDN=""
 
-# WAJIB. Email akaun admin pertama. Contoh: "saya@domain.com"
+# WAJIB. Email akaun admin pertama.
 ADMIN_EMAIL=""
+#============================================================================
+#  OPSIONAL — semuanya boleh biar kosong
+#============================================================================
 
-# WAJIB. Username admin. Huruf/nombor/titik/underscore/dash, minimum 3 aksara.
+# OPSIONAL — default: "admin"
 ADMIN_USERNAME=""
 
-# WAJIB. Password admin. Minimum 8 aksara.
-# Pterodactyl minta ada huruf besar, huruf kecil dan nombor.
+# OPSIONAL — default: dijana automatik dan dipaparkan pada penghujung.
+# Kalau diisi: minimum 8 aksara, mesti ada huruf besar, huruf kecil dan nombor.
 ADMIN_PASSWORD=""
 
-# WAJIB. Zon waktu panel. Contoh: "Asia/Kuala_Lumpur", "Asia/Jakarta", "UTC"
-# Senarai penuh: `timedatectl list-timezones`
+# OPSIONAL — default: dikesan daripada zon waktu sistem.
+# Contoh: "Asia/Kuala_Lumpur", "Asia/Jakarta", "UTC"
 PANEL_TIMEZONE=""
 
 
-#============================================================================
-#  BAHAGIAN 2 — WAJIB BERSYARAT
-#  Hanya wajib kalau syarat di sebelahnya benar. Kalau tidak, biar kosong.
-#============================================================================
-
-# WAJIB JIKA PANEL_SSL="yes". Email untuk daftar sijil Let's Encrypt.
-# Kalau PANEL_SSL="no", biar kosong.
+# OPSIONAL — default: ADMIN_EMAIL. Email pendaftaran Let's Encrypt.
 SSL_EMAIL=""
 
-# WAJIB JIKA INSTALL_WINGS="yes". Domain/IP node tempat game server berjalan.
-# Boleh sama dengan PANEL_FQDN kalau panel + wings atas server yang sama.
+# OPSIONAL — default: PANEL_FQDN. Domain/IP node tempat game server berjalan.
 WINGS_FQDN=""
 
-# WAJIB JIKA INSTALL_WINGS="yes". Nama node dalam panel. Contoh: "node-kl-01"
+# OPSIONAL — default: hostname mesin ini.
 NODE_NAME=""
 
-# WAJIB JIKA INSTALL_WINGS="yes". Kod lokasi pendek, 1-60 aksara. Contoh: "my", "sg1"
+# OPSIONAL — default: "main". Kod lokasi pendek.
 NODE_LOCATION=""
-
-
-#============================================================================
-#  BAHAGIAN 3 — OPSIONAL (boleh biar kosong semua)
-#  Setiap satu ada default. Isi hanya kalau nak ubah.
-#============================================================================
 
 #--- Panel -----------------------------------------------------------------
 
-# OPSIONAL — default: "yes"
+# OPSIONAL — default: "no" untuk IP, ditanya untuk domain
 # "yes" = pasang sijil Let's Encrypt automatik (perlu domain sebenar + port 80 terbuka).
 # "no"  = HTTP kosong sahaja.
 PANEL_SSL=""
@@ -80,6 +76,15 @@ ADMIN_LAST_NAME=""
 # OPSIONAL — default: "no"
 # "yes" = benarkan Pterodactyl hantar data telemetri anonim ke upstream.
 PANEL_TELEMETRY=""
+
+# OPSIONAL — default: "yes". Pasang Node.js LTS.
+INSTALL_NODEJS=""
+
+# OPSIONAL — default: "yes". Pasang Python 3 + pip + venv.
+INSTALL_PYTHON=""
+
+# OPSIONAL — default: "22". Versi major Node.js.
+NODEJS_MAJOR=""
 
 # OPSIONAL — default: "no"
 # "yes" = hidupkan reCAPTCHA di halaman login (perlu RECAPTCHA_SITE_KEY + SECRET_KEY).
