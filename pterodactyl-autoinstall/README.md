@@ -149,12 +149,25 @@ sendiri), `.env` + migrasi + egg rasmi, akaun admin, nginx + PHP-FPM, queue
 worker, Docker, binari Wings, node + allocation + `config.yml`, handshake
 Wings↔Panel, import egg custom, dan log masuk HTTP sebenar.
 
+Rantaian fallback yang benar-benar dilihat berjalan semasa ujian, bukan sekadar
+ditulis:
+
+- **Composer**: kaedah 1 kena rate-limit GitHub → kaedah 2 `--prefer-source`
+  mengambil alih sendiri dan berjaya.
+- **Docker**: kaedah 1 (daemon sedia ada) gagal → kaedah 2 `get.docker.com`
+  berjaya.
+- **Queue worker**: unit systemd gagal (tiada systemd) → script pelancar berjaya.
+- **Subnet Wings**: mengesan pertindihan dan mencuba 172.19 → 172.20 → 172.21
+  → 172.22 → 172.23 berturut-turut, dengan had 5 cubaan.
+
 **Tidak dapat diuji dalam persekitaran itu:**
 
 1. **Sijil Let's Encrypt** — perlukan domain awam sebenar.
-2. **Wings hidup sepenuhnya** — kernel VM ujian dibina tanpa IPv6, jadi Docker
-   tidak boleh mencipta bridge `pterodactyl0` sama sekali. Semua langkah sebelum
-   itu disahkan; kegagalan ini dilaporkan dengan puncanya yang tepat.
+2. **Wings hidup sepenuhnya** — kernel VM ujian dibina **tanpa IPv6**, jadi
+   Docker tidak boleh mencipta bridge sama sekali. Rantaian subnet berjaya
+   melepasi ralat "Pool overlaps", kemudian terserempak had kernel ini. Script
+   melaporkan puncanya dengan tepat dan tidak berpura-pura berjaya. Pada VPS
+   KVM biasa `/proc/sys/net/ipv6` memang wujud dan langkah ini berfungsi.
 3. **UFW/fail2ban** — tidak diaktifkan dalam container.
 
 ## Dari mana pembetulan datang

@@ -216,8 +216,25 @@ register_allocations() {
 
 # Tulis seksyen docker.network ke config.yml supaya Wings tidak bertindih
 # dengan rangkaian Docker yang sudah ada.
+#
+# Subnet dipilih semula di sini kalau pilihan tersimpan ternyata sudah diguna.
+# Ini penting kerana pilihan asal dibuat semasa autofill — SEBELUM Docker
+# dipasang — jadi julat yang nampak bebas ketika itu boleh menjadi docker0
+# sendiri beberapa fasa kemudian.
 write_wings_network_section() {
     local subnet="$1" gw
+    if subnet_in_use "$subnet"; then
+        local o cand
+        for o in 19 20 21 22 23 24 25 26 27 28 29 30 31 18; do
+            cand="172.$o.0.0/16"
+            subnet_in_use "$cand" && continue
+            log_info "Subnet $subnet kini diguna — tukar ke $cand"
+            subnet="$cand"
+            CFG[WINGS_DOCKER_SUBNET]="$cand"
+            state_put wings-subnet "$cand"
+            break
+        done
+    fi
     gw="$(awk -F'[./]' '{ print $1 "." $2 ".0.1" }' <<<"$subnet")"
     # Buang seksyen docker lama kalau ada, supaya fungsi ini idempoten.
     if grep -q '^docker:' "$WINGS_ETC/config.yml" 2>/dev/null; then
@@ -248,7 +265,15 @@ YAML
 
 verify_wings_config() {
     [[ -s "$WINGS_ETC/config.yml" ]] || return 1
-    grep -qE '^(uuid|token_id|token|api):' "$WINGS_ETC/config.yml"
+    grep -qE '^(uuid|token_id|token|api):' "$WINGS_ETC/config.yml" || return 1
+    # Token yang sah tidak cukup: kalau subnet yang tertulis kini diguna oleh
+    # rangkaian lain, Wings akan mati dengan "Pool overlaps" dan config ini
+    # memang perlu ditulis semula. Tanpa semakan ini, fasa config melaporkan
+    # "sudah dipenuhi" dan pembetulan subnet tidak pernah berlaku.
+    local sub
+    sub="$(awk '/^ *subnet:/ { print $2; exit }' "$WINGS_ETC/config.yml" 2>/dev/null || true)"
+    [[ -n "$sub" ]] && subnet_in_use "$sub" && return 1
+    return 0
 }
 
 STRATEGY_DESC["wings_config_from_panel"]="jana config.yml melalui p:node:configuration"
@@ -296,7 +321,21 @@ phase_wings_node() {
 #===========================================================================
 # Service Wings — dengan pembaikan diri untuk punca yang diketahui
 #===========================================================================
-verify_wings_running() { pgrep -x wings >/dev/null 2>&1; }
+# Kehadiran proses SAHAJA bukan bukti. Bila persekitaran Docker tidak sah,
+# Wings hidup kira-kira satu saat, mencetak FATAL, kemudian mati — cukup lama
+# untuk pgrep melihatnya. Kalau kita percaya pgrep, fasa ini akan mengisytiharkan
+# kejayaan dan seluruh rantaian fallback tidak akan pernah dicuba. Jadi: biar ia
+# reda dahulu, semak semula, dan pastikan ia benar-benar menjawab pada portnya.
+verify_wings_running() {
+    pgrep -x wings >/dev/null 2>&1 || return 1
+    sleep 2
+    pgrep -x wings >/dev/null 2>&1 || return 1
+    # Tanpa token, Wings memulangkan 401 — itu bukti ia mendengar dan sihat.
+    local code
+    code="$(curl -sS -k -o /dev/null -w '%{http_code}' --max-time 8 \
+            "http://127.0.0.1:$(cfg WINGS_PORT)/api/system" 2>/dev/null || printf '000')"
+    [[ "$code" =~ ^(200|401|403)$ ]]
+}
 
 wings_recent_log() {
     local out=""
@@ -343,25 +382,63 @@ UNIT
             >/var/log/wings.log 2>&1 </dev/null &
         disown 2>/dev/null || true
     fi
-    wait_for 12 verify_wings_running
+    wait_for 6 verify_wings_running
 }
 
 STRATEGY_DESC["wings_start_plain"]="mulakan Wings"
 wings_start_plain() { wings_launch; }
 
-STRATEGY_DESC["wings_fix_subnet"]="pilih subnet Docker lain dan mula semula"
+# Adakah julat /16 ini bertindih dengan rangkaian Docker atau laluan yang ada?
+subnet_in_use() {
+    local prefix="${1%.0.0/16}." used="" ids
+    ids="$(docker network ls -q 2>/dev/null || true)"
+    if [[ -n "$ids" ]]; then
+        # shellcheck disable=SC2086
+        used="$(docker network inspect $ids \
+                --format '{{if ne .Name "pterodactyl_nw"}}{{range .IPAM.Config}}{{.Subnet}} {{end}}{{end}}' \
+                2>/dev/null || true)"
+    fi
+    # Kecualikan laluan milik pterodactyl0 itu sendiri — kalau tidak, subnet
+    # yang Wings sedang guna dengan jayanya akan dikira "diguna" dan config
+    # ditulis semula pada setiap run.
+    used="$used $(ip -4 route show 2>/dev/null \
+                  | awk '$0 !~ /pterodactyl0/ { print $1 }' | tr '\n' ' ' || true)"
+    [[ "$used" == *"$prefix"* ]]
+}
+
+STRATEGY_DESC["wings_fix_subnet"]="cuba beberapa subnet Docker lain"
 wings_fix_subnet() {
     local out; out="$(wings_recent_log)"
     [[ "$out" == *"Pool overlaps"* || "$out" == *"pool overlaps"* ]] || return 1
-    # Julat yang kita pilih ternyata masih bertindih — buang rangkaian Wings
-    # yang separuh tercipta dan pilih julat lain.
-    docker network rm pterodactyl_nw >>"$LOG_FILE" 2>&1 || true
-    local fresh; fresh="$(detect_free_subnet)"
-    [[ -z "$fresh" || "$fresh" == "$(cfg WINGS_DOCKER_SUBNET)" ]] && return 1
-    log_info "Subnet $(cfg WINGS_DOCKER_SUBNET) bertindih — tukar ke $fresh"
-    CFG[WINGS_DOCKER_SUBNET]="$fresh"
-    write_wings_network_section "$fresh"
-    wings_launch
+
+    # PENTING: jangan guna detect_free_subnet di sini. Ia sengaja mengekalkan
+    # pilihan yang tersimpan supaya subnet node tidak hanyut antara run — jadi
+    # ia akan memulangkan julat yang SAMA yang baru gagal, dan fallback ini
+    # menyerah tanpa mencuba apa-apa. Pilih calon sendiri, dan cuba beberapa:
+    # Docker mengira pertindihan terhadap keadaan yang mungkin berubah selepas
+    # setiap percubaan.
+    local o cand tries=0
+    for o in 19 20 21 22 23 24 25 26 27 28 29 30 31 18; do
+        (( tries >= 5 )) && break
+        cand="172.$o.0.0/16"
+        [[ "$cand" == "$(cfg WINGS_DOCKER_SUBNET)" ]] && continue
+        subnet_in_use "$cand" && continue
+        tries=$((tries + 1))
+        log_info "Subnet $(cfg WINGS_DOCKER_SUBNET) bertindih — cuba $cand"
+        docker network rm pterodactyl_nw >>"$LOG_FILE" 2>&1 || true
+        CFG[WINGS_DOCKER_SUBNET]="$cand"
+        state_put wings-subnet "$cand"
+        write_wings_network_section "$cand"
+        if wings_launch; then
+            log_ok "Subnet $cand berfungsi"
+            return 0
+        fi
+        # Kalau puncanya bukan lagi pertindihan, mencuba subnet lain tidak akan
+        # membantu — serahkan kepada strategi seterusnya.
+        out="$(wings_recent_log)"
+        [[ "$out" == *"Pool overlaps"* || "$out" == *"pool overlaps"* ]] || return 1
+    done
+    return 1
 }
 
 STRATEGY_DESC["wings_fix_stale_network"]="buang rangkaian pterodactyl_nw yang tersangkut"

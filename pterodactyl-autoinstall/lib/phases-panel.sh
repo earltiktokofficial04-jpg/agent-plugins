@@ -617,11 +617,16 @@ PANEL_DIR="$PANEL_DIR"
 PHP_V="$PHP_V"
 REDIS_PORT="$(cfg REDIS_PORT)"
 
-as_web() {
-    if command -v sudo >/dev/null 2>&1; then sudo -u www-data "\$@"
-    elif command -v runuser >/dev/null 2>&1; then runuser -u www-data -- "\$@"
-    else "\$@"; fi
-}
+# MESTI prefix arahan, BUKAN fungsi shell. setsid dan nohup ialah binari luar
+# dan tidak dapat memanggil fungsi shell — cubaan itu gagal dengan
+# "nohup: failed to run command 'as_web'" dan queue worker tidak pernah bermula.
+if command -v sudo >/dev/null 2>&1; then
+    RUNAS="sudo -u www-data"
+elif command -v runuser >/dev/null 2>&1; then
+    RUNAS="runuser -u www-data --"
+else
+    RUNAS=""
+fi
 
 start() {
     mkdir -p /run/mysqld /run/php && chown mysql:mysql /run/mysqld 2>/dev/null || true
@@ -634,10 +639,10 @@ start() {
     sleep 5
     pgrep -x nginx >/dev/null || nginx 2>/dev/null || true
     pgrep -f 'artisan [q]ueue:work' >/dev/null || \\
-        { setsid nohup as_web php "\$PANEL_DIR/artisan" queue:work \\
+        { setsid nohup \$RUNAS php "\$PANEL_DIR/artisan" queue:work \\
             --queue=high,standard,low --sleep=3 --tries=3 >/var/log/pterodactyl-queue.log 2>&1 & }
     pgrep -f '[s]chedule:run' >/dev/null || \\
-        { setsid nohup bash -c "while true; do php \$PANEL_DIR/artisan schedule:run >/dev/null 2>&1; sleep 60; done" >/dev/null 2>&1 & }
+        { setsid nohup bash -c "while true; do \$RUNAS php \$PANEL_DIR/artisan schedule:run >/dev/null 2>&1; sleep 60; done" >/dev/null 2>&1 & }
     if [ -x /usr/local/bin/wings ]; then
         pgrep -x wings >/dev/null || \\
             { setsid nohup /usr/local/bin/wings --config /etc/pterodactyl/config.yml >/var/log/wings.log 2>&1 & }
