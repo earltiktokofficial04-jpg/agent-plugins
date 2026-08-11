@@ -42,6 +42,7 @@ declare -A STRATEGY_DESC=()
 declare -A STRATEGY_USED=()
 declare -a GENERATED_SECRETS=()
 declare -a DEFERRED_WARNINGS=()
+declare -a ATTEMPT_FAILURES=()
 
 # Diisi oleh detect_system
 OS_ID=""; OS_VER=""; OS_CODENAME=""; ARCH=""; ARCH_ALT=""
@@ -139,10 +140,86 @@ on_error() {
     exit "$code"
 }
 
+on_signal() {
+    local sig="$1"
+    printf '\n\n'
+    log_warn "Dihentikan oleh isyarat $sig."
+    log_info "Fasa yang sudah siap dikekalkan dalam $STATE_FILE."
+    log_info "Sambung dengan menjalankan arahan yang sama semula:"
+    log_info "    sudo ${INSTALLER_CMDLINE:-./install.sh}"
+    cleanup_temp_swap
+    _raw "[$(_ts)] SIGNAL $sig phase=$CURRENT_PHASE"
+    exit 130
+}
+
 #---------------------------------------------------------------------------
 # Utiliti asas
 #---------------------------------------------------------------------------
 have() { command -v "$1" >/dev/null 2>&1; }
+
+# Hadkan tempoh sesuatu arahan. Tanpa ini, satu operasi rangkaian yang
+# tergantung boleh menyekat pemasangan selama-lamanya tanpa sebarang mesej.
+with_timeout() {
+    local secs="$1"; shift
+    if have timeout; then
+        timeout --kill-after=30 "$secs" "$@"
+    else
+        "$@"
+    fi
+}
+
+#---------------------------------------------------------------------------
+# Swap sementara
+#
+# Composer menyusun graf kebergantungan penuh dalam ingatan. Pada VPS 1GB tanpa
+# swap, kernel membunuhnya dengan OOM dan mesejnya ("Killed") tidak menyebut
+# ingatan langsung — ini salah satu kegagalan pemasangan Pterodactyl yang paling
+# kerap dan paling mengelirukan. Sediakan swap sementara dan tanggalkan semula
+# selepas selesai, supaya sistem pengguna tidak diubah secara kekal.
+#---------------------------------------------------------------------------
+TEMP_SWAP_FILE="/var/pterodactyl-install.swap"
+
+ensure_temp_swap() {
+    local want_mb="${1:-2048}" ram swap total
+    ram="$(ram_mb)"
+    swap="$(awk '/SwapTotal/ { printf "%d", $2 / 1024 }' /proc/meminfo 2>/dev/null || printf 0)"
+    total=$(( ram + swap ))
+    (( total >= want_mb )) && return 0
+    [[ -f "$TEMP_SWAP_FILE" ]] && return 0
+
+    local need=$(( want_mb - total ))
+    (( need < 512 )) && need=512
+    # Jangan cipta swap kalau disk sendiri hampir penuh.
+    local free; free="$(disk_mb)"
+    if (( free < need + 2048 )); then
+        log_warn "Ingatan rendah (${total}MB) tetapi ruang disk tidak cukup untuk swap sementara"
+        return 1
+    fi
+
+    log_info "Ingatan hanya ${total}MB — cipta ${need}MB swap sementara supaya composer tidak dibunuh OOM"
+    if have fallocate && fallocate -l "${need}M" "$TEMP_SWAP_FILE" 2>/dev/null; then
+        :
+    elif ! dd if=/dev/zero of="$TEMP_SWAP_FILE" bs=1M count="$need" >/dev/null 2>&1; then
+        rm -f "$TEMP_SWAP_FILE"
+        return 1
+    fi
+    chmod 600 "$TEMP_SWAP_FILE"
+    if ! mkswap "$TEMP_SWAP_FILE" >>"$LOG_FILE" 2>&1 || ! swapon "$TEMP_SWAP_FILE" >>"$LOG_FILE" 2>&1; then
+        # Sesetengah VPS (OpenVZ, sesetengah container) melarang swapon.
+        log_warn "Kernel ini tidak membenarkan swap tambahan — teruskan tanpanya"
+        rm -f "$TEMP_SWAP_FILE"
+        return 1
+    fi
+    log_ok "Swap sementara ${need}MB diaktifkan"
+    return 0
+}
+
+cleanup_temp_swap() {
+    [[ -f "$TEMP_SWAP_FILE" ]] || return 0
+    swapoff "$TEMP_SWAP_FILE" 2>/dev/null || true
+    rm -f "$TEMP_SWAP_FILE" 2>/dev/null || true
+    return 0
+}
 
 # Ulang arahan dengan backoff. Guna untuk operasi rangkaian.
 retry() {
@@ -349,20 +426,50 @@ attempt() {
         i=$((i + 1))
         log_try "$goal — kaedah $i/$total: $(strategy_label "$fn")"
         _raw "[$(_ts)] ATTEMPT goal='$goal' strategy=$fn ($i/$total)"
+        local mark
+        mark="$(wc -l <"$LOG_FILE" 2>/dev/null || printf 0)"
         if "$fn" >>"$LOG_FILE" 2>&1; then
             if "$verify" >/dev/null 2>&1; then
                 log_ok "$goal — berjaya melalui $(strategy_label "$fn")"
                 STRATEGY_USED["$goal"]="$fn"
                 return 0
             fi
+            record_attempt_failure "$goal" "$fn" "$mark" "selesai tetapi pengesahan tidak lulus"
             log_warn "$goal — $(strategy_label "$fn") selesai tetapi pengesahan tidak lulus"
         else
+            record_attempt_failure "$goal" "$fn" "$mark" ""
             log_warn "$goal — $(strategy_label "$fn") gagal"
         fi
     done
 
     log_err "$goal — semua $total kaedah gagal"
+    explain_attempt_failures "$goal"
     return 1
+}
+
+# Ambil baris ralat yang paling bermakna daripada output strategi itu sendiri,
+# supaya ringkasan akhir boleh memberitahu MENGAPA sesuatu gagal.
+record_attempt_failure() {
+    local goal="$1" fn="$2" mark="$3" note="$4" why=""
+    why="$( { tail -n "+$((mark + 1))" "$LOG_FILE" 2>/dev/null \
+              | grep -iE 'error|fatal|cannot|unable|failed|denied|not found|no space|killed' \
+              | grep -viE '^\[|EXEC|RETRY' \
+              | tail -n 1; } 2>/dev/null || true )"
+    why="$(printf '%s' "$why" | cut -c1-160)"
+    [[ -z "$why" ]] && why="$note"
+    [[ -z "$why" ]] && why="tiada mesej ralat yang jelas dalam log"
+    ATTEMPT_FAILURES+=("$goal|$(strategy_label "$fn")|$why")
+    return 0
+}
+
+explain_attempt_failures() {
+    local goal="$1" e g s w
+    for e in "${ATTEMPT_FAILURES[@]}"; do
+        IFS='|' read -r g s w <<<"$e"
+        [[ "$g" == "$goal" ]] || continue
+        log_err "  · $s: $w"
+    done
+    return 0
 }
 
 # Cari corak dalam log baru-baru ini. Untuk memadankan punca kegagalan.

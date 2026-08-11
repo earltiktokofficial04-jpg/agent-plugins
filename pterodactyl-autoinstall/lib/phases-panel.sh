@@ -27,28 +27,32 @@ _extract_panel_tarball() {
 
 STRATEGY_DESC["panel_dl_curl"]="muat turun keluaran terkini dengan curl"
 panel_dl_curl() {
-    curl -fsSL --max-time 300 --retry 3 --retry-delay 2 -o /tmp/panel.tar.gz "$PANEL_TARBALL" || return 1
-    _extract_panel_tarball /tmp/panel.tar.gz
+    local f; f="$(mktemp)"
+    curl -fsSL --max-time 300 --retry 3 --retry-delay 2 -o "$f" "$PANEL_TARBALL" || { rm -f "$f"; return 1; }
+    _extract_panel_tarball "$f"
 }
 
 STRATEGY_DESC["panel_dl_wget"]="muat turun dengan wget"
 panel_dl_wget() {
     have wget || return 1
-    wget -q --tries=3 --timeout=60 -O /tmp/panel.tar.gz "$PANEL_TARBALL" || return 1
-    _extract_panel_tarball /tmp/panel.tar.gz
+    local f; f="$(mktemp)"
+    wget -q --tries=3 --timeout=60 -O "$f" "$PANEL_TARBALL" || { rm -f "$f"; return 1; }
+    _extract_panel_tarball "$f"
 }
 
 STRATEGY_DESC["panel_dl_pinned"]="muat turun versi tetap yang diketahui baik"
 panel_dl_pinned() {
     # Bila "latest" tidak dapat diselesaikan (redirect tersekat, API dihadkan),
     # ambil versi tetap yang memang wujud.
-    local v
+    local v f
     for v in v1.15.0 v1.11.11; do
-        if curl -fsSL --max-time 300 -o /tmp/panel.tar.gz \
+        f="$(mktemp)"
+        if curl -fsSL --max-time 300 -o "$f" \
             "https://github.com/pterodactyl/panel/releases/download/$v/panel.tar.gz"; then
             log_info "Guna versi tetap $v kerana 'latest' tidak dapat diambil"
-            _extract_panel_tarball /tmp/panel.tar.gz && return 0
+            _extract_panel_tarball "$f" && return 0
         fi
+        rm -f "$f"
     done
     return 1
 }
@@ -97,7 +101,31 @@ composer_clear_cache_retry() {
     _composer_run install --no-dev --optimize-autoloader
 }
 
+# Adakah ini pemasangan yang sudah hidup, bukan direktori kosong?
+existing_panel_present() {
+    [[ -f "$PANEL_DIR/artisan" && -f "$PANEL_DIR/.env" ]] || return 1
+    db_cli -sN -D"$(cfg DB_NAME)" -e "SELECT COUNT(*) FROM migrations" >/dev/null 2>&1
+}
+
 phase_panel_files() {
+    # Menulis fail panel di atas pemasangan yang sedang hidup adalah operasi
+    # yang merosakkan. Ambil backup dahulu supaya ada jalan pulang.
+    if existing_panel_present; then
+        log_warn "Pemasangan panel sedia ada dikesan di $PANEL_DIR"
+        if backup_now pre-install; then
+            log_ok "Backup diambil sebelum menyentuh apa-apa"
+        else
+            defer_warning "Backup pemasangan sedia ada GAGAL. Fail panel akan ditulis ganti tanpa jaring — batalkan sekarang kalau data itu penting."
+            confirm "Teruskan tanpa backup?" || die "Dibatalkan. Betulkan backup dahulu, atau guna --upgrade."
+        fi
+    fi
+
+    # Panel ~150MB, vendor ~250MB, cache composer ~300MB, ruang kerja tar.
+    local free; free="$(disk_mb)"
+    if (( free < 1536 )); then
+        die "Ruang kosong pada / hanya ${free}MB. Muat turun dan composer memerlukan sekurang-kurangnya 1.5GB, dan disk yang penuh separuh jalan meninggalkan pemasangan yang rosak. Kosongkan ruang dahulu."
+    fi
+
     attempt "Fail panel" verify_panel_files \
         panel_dl_curl panel_dl_wget panel_dl_pinned \
         || die "Tidak dapat memuat turun panel. Semak sambungan ke github.com."
@@ -106,6 +134,11 @@ phase_panel_files() {
     # membocorkan maklumat, dan hanya www-data perlu membacanya.
     chown -R www-data:www-data "$PANEL_DIR/storage" "$PANEL_DIR/bootstrap/cache" 2>/dev/null || true
     chmod -R 750 "$PANEL_DIR/storage" "$PANEL_DIR/bootstrap/cache" 2>/dev/null || true
+
+    # Composer menyusun keseluruhan graf kebergantungan dalam ingatan. Pada VPS
+    # 1GB tanpa swap, kernel membunuhnya dan mesejnya hanya "Killed" — tiada
+    # petunjuk bahawa ingatan puncanya.
+    ensure_temp_swap 2048 || true
 
     if ! attempt "Kebergantungan PHP panel (composer)" verify_vendor \
         composer_install_plain \
@@ -119,8 +152,16 @@ phase_panel_files() {
             log_err "Jana token di https://github.com/settings/tokens (tiada skop diperlukan),"
             log_err "kemudian jalankan semula dengan: --github-token ghp_xxxxx"
         fi
+        if log_has 'Killed' 200 || log_has 'Out of memory' 200 || log_has 'Allowed memory size' 200; then
+            log_err "Composer dibunuh kerana kehabisan ingatan."
+            log_err "Tambah swap kekal pada server ini, kemudian jalankan semula:"
+            log_err "  fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile"
+            log_err "  echo '/swapfile none swap sw 0 0' >> /etc/fstab"
+        fi
+        cleanup_temp_swap
         die "Composer tidak dapat memasang kebergantungan panel. Semak $LOG_FILE"
     fi
+    cleanup_temp_swap
 
     local ver
     ver="$( { grep -oE "'version' => '[^']+'" "$PANEL_DIR/config/app.php" | head -1; } 2>/dev/null || true )"
@@ -156,6 +197,14 @@ art() { ( cd "$PANEL_DIR" && run php artisan "$@" ); }
 art_out() { ( cd "$PANEL_DIR" && php artisan "$@" 2>>"$LOG_FILE" ); }
 
 panel_url() {
+    # Di belakang proxy, pengguna melihat skema dan port PROXY, bukan yang
+    # didengari nginx di sini. APP_URL mesti sepadan dengan apa yang dilihat
+    # pelayar — kalau tidak, aset dimuatkan melalui http pada halaman https
+    # (pelayar menyekatnya) dan sesi hilang pada setiap permintaan.
+    if cfg_is BEHIND_PROXY yes; then
+        printf '%s://%s' "$(cfg PROXY_SCHEME)" "$(cfg PANEL_FQDN)"
+        return 0
+    fi
     local scheme; cfg_is PANEL_SSL yes && scheme=https || scheme=http
     local url="$scheme://$(cfg PANEL_FQDN)"
     local p; p="$(cfg PANEL_HTTP_PORT)"
@@ -221,6 +270,13 @@ phase_panel_env() {
     fi
 
     env_set APP_URL "$(panel_url)"
+    if cfg_is BEHIND_PROXY yes; then
+        # Tanpa ini Laravel melihat setiap permintaan sebagai http dan datang
+        # dari IP proxy: redirect salah skema, dan rate limiting mengira semua
+        # pengguna sebagai satu.
+        env_set TRUSTED_PROXIES "$(cfg TRUSTED_PROXIES)"
+        log_info "Panel dikonfigurasi untuk berada di belakang proxy ($(cfg PROXY_SCHEME)), TRUSTED_PROXIES=$(cfg TRUSTED_PROXIES)"
+    fi
     env_set PTERODACTYL_TELEMETRY_ENABLED "$( cfg_is PANEL_TELEMETRY yes && printf true || printf false )"
     if cfg_is RECAPTCHA_ENABLED yes; then
         env_set RECAPTCHA_ENABLED true
@@ -433,6 +489,21 @@ APACHE
 }
 
 phase_webserver() {
+    # Kalau Apache sudah memegang port itu dan sedang berjalan, melawannya
+    # dengan nginx bermakna salah satu daripadanya tidak akan bermula. Lebih
+    # baik guna yang sudah ada di situ.
+    local owner; owner="$(port_owner "$(nginx_listen_port)")"
+    if [[ "$owner" == *apache* ]] || { [[ "$owner" == *httpd* ]] && ! have nginx; }; then
+        log_info "Apache sedang memegang port $(nginx_listen_port) — konfigurasikan Apache dan bukannya nginx"
+        attempt "Panel disajikan melalui HTTP" verify_webserver \
+            web_apache \
+            web_nginx \
+            web_nginx_alt_port \
+            || die "Tiada pelayan web yang dapat menyajikan panel. Semak $LOG_FILE"
+        log_ok "Panel disajikan pada port $(nginx_listen_port)"
+        return 0
+    fi
+
     attempt "Panel disajikan melalui HTTP" verify_webserver \
         web_nginx \
         web_nginx_no_ipv6 \
@@ -498,6 +569,10 @@ ssl_certbot_standalone() {
 }
 
 phase_ssl() {
+    if cfg_is BEHIND_PROXY yes; then
+        log_skip "Panel di belakang proxy — HTTPS dikendalikan di sana, bukan di sini"
+        return 0
+    fi
     if ! cfg_is PANEL_SSL yes; then
         log_skip "HTTPS tidak diminta — dilangkau"
         return 0

@@ -195,6 +195,16 @@ wizard() {
             "Perlu domain di atas sudah point ke server ini dan port 80 terbuka dari internet."
     fi
 
+    # 2b — proxy hadapan. Hanya ditanya bila ia benar-benar boleh berlaku:
+    # alamat berbentuk domain, tetapi pengguna tidak mahu sijil di sini.
+    # Ini corak Cloudflare, dan tanpa TRUSTED_PROXIES panel akan kelihatan
+    # rosak dengan cara yang mengelirukan (aset tersekat, sesi hilang).
+    if ! is_ip_literal "$(cfg PANEL_FQDN)" && cfg_is PANEL_SSL no; then
+        ask_yesno BEHIND_PROXY \
+            "Adakah panel ini di belakang Cloudflare atau reverse proxy yang sudah kendalikan HTTPS?" no \
+            "Jawab ya kalau pelawat sampai melalui https tetapi server ini hanya menyajikan http di belakangnya."
+    fi
+
     # 3 — email admin
     ask ADMIN_EMAIL \
         "Email untuk akaun admin?" \
@@ -336,7 +346,8 @@ autofill() {
 save_answers() {
     state_init
     local keys="PANEL_FQDN PANEL_SSL SSL_EMAIL ADMIN_EMAIL ADMIN_USERNAME ADMIN_PASSWORD
-                INSTALL_WINGS INSTALL_NODEJS INSTALL_PYTHON PANEL_TIMEZONE"
+                INSTALL_WINGS INSTALL_NODEJS INSTALL_PYTHON PANEL_TIMEZONE
+                BEHIND_PROXY PROXY_SCHEME"
     local k
     # Nota: `[[ -n x ]] && printf` sebagai pernyataan terakhir dalam loop akan
     # menjadikan status keluar subshell 1 apabila kunci terakhir kosong, yang
@@ -390,7 +401,8 @@ show_plan() {
     printf '    Admin               : %s <%s>\n' "$(cfg ADMIN_USERNAME)" "$(cfg ADMIN_EMAIL)"
     printf '    Password admin      : %s\n' \
         "$( [[ " ${GENERATED_SECRETS[*]:-} " == *ADMIN_PASSWORD* ]] && printf 'dijana automatik' || printf 'yang kau taip' )"
-    printf '    HTTPS               : %s\n' "$(cfg PANEL_SSL)"
+    printf '    HTTPS               : %s\n' \
+        "$( cfg_is BEHIND_PROXY yes && printf 'dikendalikan oleh proxy hadapan' || cfg PANEL_SSL )"
     printf '    Wings               : %s\n' "$(cfg INSTALL_WINGS)"
     printf '    Node.js + Python    : %s\n' "$(cfg INSTALL_NODEJS)"
 

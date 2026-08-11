@@ -33,14 +33,22 @@ INSTALLER_CMDLINE="$0 $*"
 . "$SELF_DIR/lib/phases-wings.sh"
 # shellcheck source=lib/verify.sh
 . "$SELF_DIR/lib/verify.sh"
+# shellcheck source=lib/modes.sh
+. "$SELF_DIR/lib/modes.sh"
 
 trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR
+# Ctrl-C tidak boleh meninggalkan pengguna tanpa arah, dan tidak boleh
+# meninggalkan swap sementara yang tersangkut.
+trap 'on_signal INT'  INT
+trap 'on_signal TERM' TERM
+trap 'cleanup_temp_swap' EXIT
 
 CONFIG_FILE=""
 MODE="install"
 INTERACTIVE="auto"
 RECONFIGURE="no"
 SKIP_PREFLIGHT="no"
+RESTORE_FROM=""
 
 usage() {
     cat <<USAGE
@@ -50,6 +58,13 @@ Pterodactyl Auto-Installer v$INSTALLER_VERSION
 
 Mod
   (tiada)               Pasang. Tanya beberapa soalan, kemudian buat sampai siap.
+  --wings-only          Pasang Wings sahaja pada mesin ini, sambung ke panel
+                        yang sudah wujud di tempat lain.
+  --add-node            Daftar node tambahan pada panel di mesin ini.
+  --upgrade             Naik taraf panel ke keluaran terkini (backup dahulu).
+  --backup              Simpan pangkalan data, .env dan config Wings.
+  --restore [FOLDER]    Pulihkan daripada backup (default: yang terakhir).
+  --status              Laporkan versi, service, dan kiraan dalam panel.
   --doctor              Semak pemasangan sedia ada dan baiki apa yang boleh.
   --uninstall           Buang panel, pangkalan data, config Wings dan service.
 
@@ -81,6 +96,17 @@ parse_args() {
             --reconfigure)     RECONFIGURE="yes"; shift ;;
             --doctor)          MODE="doctor"; shift ;;
             --uninstall)       MODE="uninstall"; shift ;;
+            --wings-only)      MODE="wings-only"; shift ;;
+            --add-node)        MODE="add-node"; shift ;;
+            --upgrade)         MODE="upgrade"; shift ;;
+            --backup)          MODE="backup"; shift ;;
+            --status)          MODE="status"; shift ;;
+            --restore)
+                MODE="restore"; shift
+                # Argumen folder adalah pilihan; jangan telan bendera lain.
+                if [[ $# -ge 1 && "$1" != -* ]]; then RESTORE_FROM="$1"; shift; fi
+                ;;
+            --restore=*)       MODE="restore"; RESTORE_FROM="${1#*=}"; shift ;;
             --dry-run)         DRY_RUN="yes"; shift ;;
             --force)           FORCE_ALL="yes"; shift ;;
             --skip-preflight)  SKIP_PREFLIGHT="yes"; shift ;;
@@ -280,16 +306,30 @@ main() {
     detect_system
     PHP_V="$(state_get php-version)"
 
+    # Mod yang beroperasi ke atas pemasangan sedia ada berkongsi persediaan yang
+    # sama: muatkan jawapan yang disimpan, isi default, kemudian jalankan.
     case "$MODE" in
-        doctor)
+        doctor|uninstall|upgrade|backup|restore|status|add-node)
+            [[ -n "$CONFIG_FILE" ]] && { load_config_file "$CONFIG_FILE" || die "Fail config tidak dijumpai: $CONFIG_FILE"; }
             load_saved_answers || true
             autofill
-            do_doctor
+            case "$MODE" in
+                doctor)    do_doctor ;;
+                uninstall) do_uninstall ;;
+                upgrade)   do_upgrade ;;
+                backup)    do_backup ;;
+                restore)   do_restore ;;
+                status)    do_status ;;
+                add-node)  do_add_node ;;
+            esac
             ;;
-        uninstall)
+        wings-only)
+            [[ -n "$CONFIG_FILE" ]] && { load_config_file "$CONFIG_FILE" || die "Fail config tidak dijumpai: $CONFIG_FILE"; }
             load_saved_answers || true
+            # autofill mesti dijalankan: tanpanya WINGS_DATA_DIR, WINGS_PORT dan
+            # rakan-rakannya kosong, dan fasa Wings gagal pada mkdir kosong.
             autofill
-            do_uninstall
+            do_wings_only
             ;;
     esac
 
@@ -315,32 +355,43 @@ main() {
 
     [[ "$SKIP_PREFLIGHT" == "yes" ]] && log_warn "Preflight dilangkau atas permintaan" || preflight
 
-    TOTAL_PHASES=13
-    cfg_is INSTALL_WINGS yes && TOTAL_PHASES=17
-
-    run_phase deps        "Pakej asas sistem"                     phase_deps
-    run_phase php         "PHP dan sambungannya"                  phase_php
-    run_phase composer    "Composer"                              phase_composer
-    run_phase nodejs      "Node.js"                               phase_nodejs
-    run_phase python      "Python 3"                              phase_python
-    run_phase mariadb     "Pangkalan data"                        phase_mariadb
-    run_phase redis       "Redis"                                 phase_redis
-    run_phase panel_files "Muat turun dan pasang Panel"           phase_panel_files
-    run_phase panel_env   "Konfigurasi panel, migrasi, egg rasmi" phase_panel_env
-    run_phase panel_admin "Akaun admin"                           phase_panel_admin
-    run_phase webserver   "Pelayan web"                           phase_webserver
-    run_phase ssl         "HTTPS"                                 phase_ssl
-    run_phase services    "Queue worker dan scheduler"            phase_services
-
+    # Senarai fasa dibina dahulu supaya jumlahnya dikira, bukan ditulis tangan.
+    # Nombor yang ditulis tangan hanyut setiap kali satu fasa ditambah, dan
+    # pengguna melihat "(19/17)".
+    local -a PHASES=(
+        "deps|Pakej asas sistem|phase_deps"
+        "php|PHP dan sambungannya|phase_php"
+        "composer|Composer|phase_composer"
+        "nodejs|Node.js|phase_nodejs"
+        "python|Python 3|phase_python"
+        "mariadb|Pangkalan data|phase_mariadb"
+        "redis|Redis|phase_redis"
+        "panel_files|Muat turun dan pasang Panel|phase_panel_files"
+        "panel_env|Konfigurasi panel, migrasi, egg rasmi|phase_panel_env"
+        "panel_admin|Akaun admin|phase_panel_admin"
+        "webserver|Pelayan web|phase_webserver"
+        "ssl|HTTPS|phase_ssl"
+        "services|Queue worker dan scheduler|phase_services"
+    )
     if cfg_is INSTALL_WINGS yes; then
-        run_phase wings_docker  "Docker"                          phase_wings_docker
-        run_phase wings_binary  "Binari Wings"                    phase_wings_binary
-        run_phase wings_node    "Node, allocation, config Wings"  phase_wings_node
-        run_phase wings_service "Service Wings"                   phase_wings_service
+        PHASES+=(
+            "wings_docker|Docker|phase_wings_docker"
+            "wings_binary|Binari Wings|phase_wings_binary"
+            "wings_node|Node, allocation, config Wings|phase_wings_node"
+            "wings_service|Service Wings|phase_wings_service"
+        )
     fi
+    PHASES+=(
+        "eggs|Egg custom|phase_eggs"
+        "firewall|Firewall|phase_firewall"
+    )
 
-    run_phase eggs     "Egg custom" phase_eggs
-    run_phase firewall "Firewall"   phase_firewall
+    TOTAL_PHASES="${#PHASES[@]}"
+    local entry pname pdesc pfn
+    for entry in "${PHASES[@]}"; do
+        IFS='|' read -r pname pdesc pfn <<<"$entry"
+        run_phase "$pname" "$pdesc" "$pfn"
+    done
 
     if [[ "$DRY_RUN" == "yes" ]]; then
         printf '\n  %sDry-run selesai — tiada apa-apa diubah.%s\n\n' "$C_CYN" "$C_OFF"

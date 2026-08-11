@@ -207,6 +207,39 @@ EGG_IMPORT_URLS=""
 # ID nest tempat egg custom di atas akan diletak.
 EGG_IMPORT_NEST_ID=""
 
+#--- Reverse proxy / Cloudflare --------------------------------------------
+
+# OPSIONAL — default: "no"
+# "yes" = panel ini di belakang Cloudflare atau reverse proxy lain yang sudah
+# mengendalikan HTTPS. Tanpa ini, Laravel melihat setiap permintaan sebagai http
+# dan datang dari IP proxy: aset tersekat pelayar, sesi hilang, dan rate limiting
+# mengira semua pengguna sebagai satu.
+BEHIND_PROXY=""
+
+# OPSIONAL — default: "https". Skema yang dilihat pengguna melalui proxy.
+PROXY_SCHEME=""
+
+# OPSIONAL — default: "*". Nilai TRUSTED_PROXIES untuk .env panel.
+# Boleh disempitkan kepada julat IP proxy anda, cth "173.245.48.0/20,103.21.244.0/22"
+TRUSTED_PROXIES=""
+
+#--- Mod --wings-only ------------------------------------------------------
+# Hanya untuk memasang Wings pada mesin KEDUA yang menyertai panel sedia ada.
+# Nilai-nilai ini datang dari panel: Admin → Nodes → (node) → Configuration →
+# Auto Deploy. Biar kosong untuk pemasangan biasa.
+
+# URL penuh panel, contoh "https://panel.domain.com"
+PANEL_URL=""
+
+# Token daripada butang Auto Deploy
+NODE_TOKEN=""
+
+# ID node (nombor) dalam panel
+NODE_ID=""
+
+# OPSIONAL — default: "no". "yes" kalau panel guna sijil yang tidak dipercayai.
+WINGS_ALLOW_INSECURE=""
+
 #--- Lain-lain -------------------------------------------------------------
 
 # OPSIONAL — default: kosong

@@ -72,6 +72,13 @@ SCHEMA=(
 "EGG_IMPORT_URLS|optional|any||URL egg custom, pisah dengan koma"
 "EGG_IMPORT_NEST_ID|optional|int|1|Nest ID untuk egg custom"
 
+"PANEL_URL|optional|url||URL panel penuh (mod --wings-only)"
+"NODE_TOKEN|optional|any||Token Auto Deploy daripada panel (mod --wings-only)"
+"NODE_ID|optional|int||ID node dalam panel (mod --wings-only)"
+"WINGS_ALLOW_INSECURE|optional|bool|no|Terima sijil panel yang tidak dipercayai"
+"BEHIND_PROXY|optional|bool|no|Panel di belakang reverse proxy / Cloudflare"
+"PROXY_SCHEME|optional|enum:http,https|https|Skema yang dilihat pengguna melalui proxy"
+"TRUSTED_PROXIES|optional|any|*|Nilai TRUSTED_PROXIES untuk .env panel"
 "GITHUB_TOKEN|optional|any||Token GitHub (elak had kadar composer)"
 "HARDEN_FIREWALL|optional|bool|no|Pasang UFW + fail2ban"
 "CREDENTIALS_FILE|optional|abspath|/root/pterodactyl-credentials.txt|Fail kredential"
@@ -92,6 +99,7 @@ v_port()     { [[ "$1" =~ ^[0-9]+$ ]] && (( $1 >= 1 && $1 <= 65535 )); }
 v_bool()     { [[ "$1" =~ ^(yes|no)$ ]]; }
 v_abspath()  { [[ "$1" == /* ]]; }
 v_cidr()     { [[ "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$ ]]; }
+v_url()      { [[ "$1" =~ ^https?://[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?(:[0-9]{1,5})?(/.*)?$ ]]; }
 v_overalloc(){ [[ "$1" == "-1" ]] || { [[ "$1" =~ ^[0-9]+$ ]] && (( $1 <= 1000 )); }; }
 
 # Password: syarat Pterodactyl sendiri — 8+ aksara, ada huruf besar, kecil, nombor.
@@ -154,6 +162,7 @@ validator_hint() {
         tz)        printf 'zon waktu tak wujud — cth "Asia/Kuala_Lumpur"' ;;
         abspath)   printf 'mesti laluan mutlak bermula dengan /' ;;
         cidr)      printf 'format CIDR, cth "172.20.0.0/16"' ;;
+        url)       printf 'mesti URL penuh bermula dengan http:// atau https://' ;;
         overalloc) printf '0-1000, atau -1 untuk tanpa had' ;;
         portrange) printf 'format "mula-tamat", cth "25565-25585"' ;;
         enum:*)    printf 'mesti salah satu daripada: %s' "${1#enum:}" ;;
@@ -244,6 +253,27 @@ validate_config() {
     # Semakan silang
     if cfg_is PANEL_SSL yes && [[ "$(cfg PANEL_FQDN)" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
         errors+=("PANEL_FQDN|PANEL_SSL=\"yes\" perlukan domain sebenar, bukan IP|Let's Encrypt tidak mengeluarkan sijil untuk alamat IP")
+    fi
+
+    # Kombinasi yang setiap satunya sah, tetapi mustahil bersama.
+    if cfg_is PANEL_SSL yes && cfg_is BEHIND_PROXY yes; then
+        errors+=("BEHIND_PROXY|tidak boleh 'yes' serentak dengan PANEL_SSL='yes'|Kalau proxy sudah mengendalikan HTTPS, server ini tidak sepatutnya cuba mendapatkan sijilnya sendiri — port 80 dipegang proxy dan cabaran Let's Encrypt akan gagal")
+    fi
+    if [[ -n "$(cfg WINGS_FQDN)" ]] && cfg_is WINGS_SSL yes \
+       && [[ "$(cfg WINGS_FQDN)" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        errors+=("WINGS_SSL|https memerlukan domain untuk node, bukan IP|Panel menolak node https yang fqdn-nya alamat IP, dan sijil tidak boleh dikeluarkan untuk IP")
+    fi
+    if [[ -n "$(cfg NODE_PORT_RANGE)" && -n "$(cfg WINGS_PORT)" ]]; then
+        local _s="${CFG[NODE_PORT_RANGE]%%-*}" _e="${CFG[NODE_PORT_RANGE]##*-}"
+        if [[ "$_s" =~ ^[0-9]+$ && "$_e" =~ ^[0-9]+$ ]]; then
+            local _wp="$(cfg WINGS_PORT)" _sp="$(cfg WINGS_SFTP_PORT)"
+            if (( _wp >= _s && _wp <= _e )); then
+                errors+=("NODE_PORT_RANGE|julat ini merangkumi port Wings sendiri ($_wp)|Satu game server akan diberi port yang Wings sedang dengar, dan ia tidak akan dapat bermula")
+            fi
+            if [[ "$_sp" =~ ^[0-9]+$ ]] && (( _sp >= _s && _sp <= _e )); then
+                errors+=("NODE_PORT_RANGE|julat ini merangkumi port SFTP Wings ($_sp)|SFTP akan berlanggar dengan game server")
+            fi
+        fi
     fi
 
     if (( ${#errors[@]} == 0 )); then

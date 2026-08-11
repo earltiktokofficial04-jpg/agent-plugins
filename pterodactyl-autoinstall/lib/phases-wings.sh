@@ -146,7 +146,24 @@ wings_dl_pinned() {
     return 1
 }
 
+# Had ingatan Wings bergantung pada perakaunan memori+swap cgroup. Pada
+# Debian/Ubuntu ia dimatikan secara lalai, dan tanpanya game server boleh
+# melebihi had yang ditetapkan dalam panel. Pembetulannya perlukan reboot,
+# jadi ini amaran, bukan sesuatu yang script boleh selesaikan sendiri.
+check_swap_accounting() {
+    [[ -r /proc/cmdline ]] || return 0
+    local cmdline; cmdline="$(cat /proc/cmdline 2>/dev/null || true)"
+    [[ "$cmdline" == *"swapaccount=1"* ]] && return 0
+    # cgroup v2 mengendalikan ini tanpa parameter kernel.
+    if [[ -f /sys/fs/cgroup/cgroup.controllers ]]; then
+        return 0
+    fi
+    defer_warning "Perakaunan swap cgroup tidak aktif, jadi had RAM game server tidak akan dikuatkuasakan sepenuhnya. Untuk membetulkannya: tambah 'swapaccount=1' pada GRUB_CMDLINE_LINUX_DEFAULT dalam /etc/default/grub, jalankan update-grub, dan reboot."
+    return 0
+}
+
 phase_wings_binary() {
+    check_swap_accounting
     mkdir -p "$WINGS_ETC" "$(cfg WINGS_DATA_DIR)"
     attempt "Binari Wings" verify_wings_binary \
         wings_dl_latest wings_dl_wget wings_dl_pinned \

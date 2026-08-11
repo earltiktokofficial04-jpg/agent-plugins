@@ -17,7 +17,42 @@ BASE_PKGS=(curl wget tar unzip git ca-certificates gnupg lsb-release
            apt-transport-https software-properties-common cron iproute2
            psmisc sudo tzdata jq)
 
+# dpkg yang tertinggal separuh konfigurasi (biasanya kerana pemasangan
+# sebelumnya diputuskan) akan menggagalkan setiap apt-get selepas ini, dengan
+# mesej yang tidak menyebut puncanya. Baiki sebelum apa-apa lagi.
+repair_dpkg_if_broken() {
+    local st
+    st="$(dpkg --audit 2>/dev/null || true)"
+    [[ -z "$st" ]] && return 0
+    log_warn "dpkg dalam keadaan separuh terkonfigurasi — cuba baiki dahulu"
+    apt_wait
+    dpkg --configure -a >>"$LOG_FILE" 2>&1 || true
+    apt_q --fix-broken install -y -qq >>"$LOG_FILE" 2>&1 || true
+    return 0
+}
+
+# Pakej cron boleh dipasang tanpa daemonnya berjalan (biasa dalam imej minimal
+# dan container). Scheduler panel bergantung sepenuhnya padanya.
+ensure_cron_running() {
+    have crontab || return 0
+    if [[ "$HAS_SYSTEMD" == "yes" ]]; then
+        systemctl enable cron >>"$LOG_FILE" 2>&1 || systemctl enable crond >>"$LOG_FILE" 2>&1 || true
+        systemctl start cron  >>"$LOG_FILE" 2>&1 || systemctl start crond  >>"$LOG_FILE" 2>&1 || true
+    fi
+    # `a || b && c` di sini akan mengelirukan; tulis secara jelas.
+    if pgrep -x cron >/dev/null 2>&1 || pgrep -x crond >/dev/null 2>&1; then
+        return 0
+    fi
+    # Tanpa systemd, lancarkan daemon terus.
+    if have cron; then
+        setsid nohup cron -f >>"$LOG_FILE" 2>&1 </dev/null &
+        disown 2>/dev/null || true
+    fi
+    return 0
+}
+
 phase_deps() {
+    repair_dpkg_if_broken
     apt_update || log_warn "apt update tidak bersih — teruskan dan lihat sama ada pakej masih boleh dipasang"
 
     # Pasang seberapa banyak yang boleh. Kalau kumpulan penuh gagal (satu pakej
@@ -37,6 +72,7 @@ phase_deps() {
     (( ${#missing[@]} == 0 )) || die "Pakej wajib masih tiada: ${missing[*]}. Semak sumber apt anda."
 
     recheck_timezone
+    ensure_cron_running
     log_ok "Pakej asas sedia"
     return 0
 }
@@ -442,6 +478,28 @@ SQL
     return 0
 }
 
+STRATEGY_DESC["db_grant_native_password"]="cipta akaun dengan mysql_native_password"
+db_grant_native_password() {
+    # Hanya bermakna pada MySQL; MariaDB tidak menggunakan caching_sha2_password.
+    local ver; ver="$(db_cli -sN -e 'SELECT VERSION()' 2>/dev/null || true)"
+    [[ "$ver" == *MariaDB* ]] && return 1
+    # MySQL 8.4 membuang plugin ini sepenuhnya — jangan cuba di situ.
+    case "$ver" in
+        8.4*|9.*) return 1 ;;
+    esac
+    local db user pass h
+    db="$(cfg DB_NAME)"; user="$(cfg DB_USERNAME)"; pass="$(sql_escape "$(cfg DB_PASSWORD)")"
+    for h in 127.0.0.1 localhost; do
+        db_cli <<SQL || return 1
+CREATE USER IF NOT EXISTS '$user'@'$h' IDENTIFIED WITH mysql_native_password BY '$pass';
+ALTER USER '$user'@'$h' IDENTIFIED WITH mysql_native_password BY '$pass';
+GRANT ALL PRIVILEGES ON \`$db\`.* TO '$user'@'$h' WITH GRANT OPTION;
+SQL
+    done
+    db_cli -e "FLUSH PRIVILEGES;" || return 1
+    return 0
+}
+
 STRATEGY_DESC["db_grant_wildcard"]="cipta akaun dengan hos '%'"
 db_grant_wildcard() {
     local db user pass
@@ -465,6 +523,7 @@ phase_mariadb() {
 
     attempt "Akaun pangkalan data panel boleh log masuk" verify_db_credentials \
         db_grant_both_hosts \
+        db_grant_native_password \
         db_grant_wildcard \
         || die "Akaun '$(cfg DB_USERNAME)' dicipta tetapi tidak boleh log masuk ke '$(cfg DB_NAME)'. Semak: $(have mariadb && printf mariadb || printf mysql) -u$(cfg DB_USERNAME) -p -h$(cfg DB_HOST) $(cfg DB_NAME)"
 
