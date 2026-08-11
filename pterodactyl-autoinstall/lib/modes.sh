@@ -15,6 +15,18 @@ _PTERO_MODES_LOADED=1
 
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/pterodactyl}"
 
+# Ditetapkan semasa panel berada dalam mod penyelenggaraan. Trap EXIT dan
+# pengendali isyarat memanggil hook di bawah, supaya Ctrl-C atau ralat maut di
+# tengah naik taraf tidak meninggalkan panel offline selama-lamanya.
+_PANEL_TAKEN_DOWN="no"
+
+panel_restore_maintenance() {
+    [[ "$_PANEL_TAKEN_DOWN" == "yes" ]] || return 0
+    _PANEL_TAKEN_DOWN="no"
+    ( cd "$PANEL_DIR" && php artisan up >/dev/null 2>&1 ) || true
+    return 0
+}
+
 #===========================================================================
 # Backup
 #===========================================================================
@@ -163,6 +175,7 @@ do_upgrade() {
 
     # Mod penyelenggaraan supaya pengguna tidak menekan panel separuh dinaik taraf.
     art down --message="Naik taraf sedang dijalankan" --retry=120 || true
+    _PANEL_TAKEN_DOWN="yes"
 
     # Jangan guna attempt() di sini: pengesahannya ialah "fail panel wujud",
     # yang sudah benar sebelum kita mula, jadi ia akan melaporkan "sudah
@@ -208,6 +221,7 @@ do_upgrade() {
     art config:clear || true
     fix_restart_queue || true
     art up || true
+    _PANEL_TAKEN_DOWN="no"
 
     if (( ok != 0 )); then
         log_err "Naik taraf tidak selesai dengan bersih."
@@ -340,6 +354,10 @@ do_add_node() {
         die "Node '$(cfg NODE_NAME)' sudah wujud dalam panel."
     fi
 
+    # Node ini akan berjalan pada mesin LAIN. Tanpa ini, phase_wings_node akan
+    # menulis /etc/pterodactyl/config.yml di sini dengan identiti node baharu,
+    # menindih config Wings mesin panel sendiri.
+    NODE_IS_LOCAL="no"
     phase_wings_node
     printf '\n  Node dicipta. Pada mesin node itu, jalankan:\n\n'
     printf '      sudo ./install.sh --wings-only\n\n'

@@ -48,6 +48,10 @@ declare -a ATTEMPT_FAILURES=()
 OS_ID=""; OS_VER=""; OS_CODENAME=""; ARCH=""; ARCH_ALT=""
 HAS_SYSTEMD="no"; VIRT="unknown"; HAS_IPV6="no"; PHP_V=""
 
+# Adakah node yang sedang dikonfigurasi berjalan pada mesin INI? --add-node
+# menetapkannya kepada "no" kerana node itu berada pada mesin lain.
+NODE_IS_LOCAL="yes"
+
 #---------------------------------------------------------------------------
 # Output
 #---------------------------------------------------------------------------
@@ -148,6 +152,8 @@ on_signal() {
     log_info "Sambung dengan menjalankan arahan yang sama semula:"
     log_info "    sudo ${INSTALLER_CMDLINE:-./install.sh}"
     cleanup_temp_swap
+    # Kalau kita berada di tengah naik taraf, jangan tinggalkan panel offline.
+    type panel_restore_maintenance >/dev/null 2>&1 && panel_restore_maintenance
     _raw "[$(_ts)] SIGNAL $sig phase=$CURRENT_PHASE"
     exit 130
 }

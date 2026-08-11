@@ -41,7 +41,7 @@ trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR
 # meninggalkan swap sementara yang tersangkut.
 trap 'on_signal INT'  INT
 trap 'on_signal TERM' TERM
-trap 'cleanup_temp_swap' EXIT
+trap 'cleanup_temp_swap; panel_restore_maintenance' EXIT
 
 CONFIG_FILE=""
 MODE="install"

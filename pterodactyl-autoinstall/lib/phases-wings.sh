@@ -329,6 +329,15 @@ phase_wings_node() {
     local total; total="$(db_q "SELECT COUNT(*) FROM allocations WHERE node_id=$node_id" 2>/dev/null || printf '0')"
     log_ok "$total allocation sedia ($(cfg NODE_ALLOCATION_IP):$(cfg NODE_PORT_RANGE))"
 
+    # config.yml mengenal pasti SATU node tertentu. Menjananya di sini hanya betul
+    # kalau mesin ini ialah node itu. Untuk --add-node, node berada pada mesin
+    # lain — dan menulisnya di sini akan menindih config Wings tempatan dengan
+    # identiti node jauh, memecahkan node tempatan pada setup satu-kotak.
+    if [[ "${NODE_IS_LOCAL:-yes}" != "yes" ]]; then
+        log_info "Node ini akan berjalan pada mesin lain, jadi config.yml tidak dijana di sini"
+        return 0
+    fi
+
     attempt "Konfigurasi Wings" verify_wings_config wings_config_from_panel \
         || die "config.yml Wings tidak dapat dijana. Semak: cd $PANEL_DIR && php artisan p:node:configuration $node_id"
     log_ok "Konfigurasi Wings ditulis ke $WINGS_ETC/config.yml"
