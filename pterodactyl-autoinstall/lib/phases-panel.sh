@@ -112,6 +112,9 @@ phase_panel_files() {
     # yang merosakkan. Ambil backup dahulu supaya ada jalan pulang.
     if existing_panel_present; then
         log_warn "Pemasangan panel sedia ada dikesan di $PANEL_DIR"
+        log_warn "Fail panel akan DIKEKALKAN pada versi semasa (pemasang tidak menulis"
+        log_warn "gantinya), tetapi .env dan migrasi masih akan disentuh. Untuk menaik"
+        log_warn "taraf panel yang sudah hidup, mod yang betul ialah:  --upgrade"
         if backup_now pre-install; then
             log_ok "Backup diambil sebelum menyentuh apa-apa"
         else
@@ -213,7 +216,17 @@ panel_url() {
 }
 
 verify_migrated() {
-    db_cli -sN -D"$(cfg DB_NAME)" -e "SELECT COUNT(*) FROM migrations" >/dev/null 2>&1
+    db_cli -sN -D"$(cfg DB_NAME)" -e "SELECT 1 FROM migrations LIMIT 1" >/dev/null 2>&1 || return 1
+    # Kehadiran jadual `migrations` SAHAJA bukan bukti skema lengkap: migrasi
+    # yang terputus di tengah jalan meninggalkan jadual itu ada dengan baki
+    # migrasi belum berjalan. Tanya panel sendiri sama ada ada yang tertunggak.
+    local out
+    out="$( ( cd "$PANEL_DIR" && php artisan migrate:status --no-ansi 2>/dev/null ) || true )"
+    # Kalau artisan tidak dapat dijalankan (belum ada vendor, .env belum sedia),
+    # jangan halang — biar langkah migrate itu sendiri yang memutuskan.
+    [[ -z "$out" ]] && return 0
+    [[ "$out" == *"Pending"* ]] && return 1
+    return 0
 }
 
 STRATEGY_DESC["panel_migrate_seed"]="php artisan migrate --seed"
@@ -304,6 +317,16 @@ phase_panel_env() {
 # Akaun admin
 #===========================================================================
 verify_admin_exists() {
+    local n
+    n="$(db_cli -sN -D"$(cfg DB_NAME)" -e \
+        "SELECT COUNT(*) FROM users WHERE root_admin = 1
+           AND (email = '$(sql_escape "$(cfg ADMIN_EMAIL)")'
+                OR username = '$(sql_escape "$(cfg ADMIN_USERNAME)")')" 2>/dev/null || printf '0')"
+    [[ "$n" != "0" ]]
+}
+
+# Untuk pengesahan akhir, soalannya berbeza: adakah ADA admin sama sekali.
+any_admin_exists() {
     local n
     n="$(db_cli -sN -D"$(cfg DB_NAME)" -e \
         "SELECT COUNT(*) FROM users WHERE root_admin = 1" 2>/dev/null || printf '0')"

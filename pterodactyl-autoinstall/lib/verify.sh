@@ -59,7 +59,7 @@ t_panel_assets() {
 
 t_db()    { db_cli -sN -D"$(cfg DB_NAME)" -e "SELECT 1" >/dev/null 2>&1; }
 t_redis() { cfg_is _REDIS_FALLBACK yes && return 0; verify_redis; }
-t_admin() { verify_admin_exists; }
+t_admin() { any_admin_exists; }
 
 t_eggs() {
     local n; n="$(db_q "SELECT COUNT(*) FROM eggs" 2>/dev/null || printf 0)"
