@@ -466,6 +466,10 @@ wings_fix_stale_network() {
 
 STRATEGY_DESC["wings_fix_port"]="tukar ke port yang bebas"
 wings_fix_port() {
+    # Strategi ini mengemas kini baris node dalam pangkalan data panel. Pada
+    # mesin --wings-only tiada panel dan tiada pangkalan data di sini, jadi ia
+    # tidak boleh berbuat apa-apa — serah kepada strategi lain.
+    [[ -f "$PANEL_DIR/artisan" ]] || return 1
     local out; out="$(wings_recent_log)"
     [[ "$out" == *"address already in use"* ]] || return 1
     local alt; alt="$(next_free_port $(( $(cfg WINGS_PORT) + 1 )) || printf '')"
@@ -502,8 +506,15 @@ phase_wings_service() {
             log_err "Punca: Wings tiada keizinan yang cukup — biasanya VPS OpenVZ/LXC."
             ;;
         *"401"*|*"403"*|*"invalid credentials"*|*"token"*)
-            log_err "Punca: Wings ditolak oleh panel. Jana semula config dengan:"
-            log_err "  cd $PANEL_DIR && php artisan p:node:configuration $(node_id_of) > $WINGS_ETC/config.yml"
+            log_err "Punca: Wings ditolak oleh panel — token dalam config.yml tidak sepadan."
+            if [[ -f "$PANEL_DIR/artisan" ]]; then
+                log_err "Jana semula config dengan:"
+                log_err "  cd $PANEL_DIR && php artisan p:node:configuration $(node_id_of) > $WINGS_ETC/config.yml"
+            else
+                # Panel berada pada mesin lain; arahan artisan tidak wujud di sini.
+                log_err "Ambil nilai baharu daripada panel (Admin → Nodes → node → Configuration →"
+                log_err "Auto Deploy), kemudian jalankan semula: $0 --wings-only --reconfigure"
+            fi
             ;;
         *)
             log_err "20 baris terakhir log Wings:"

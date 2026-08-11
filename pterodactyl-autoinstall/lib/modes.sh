@@ -313,7 +313,10 @@ phase_wings_join() {
         wings_configure_cmd wings_configure_insecure \
         || die "Wings tidak dapat mendaftar dengan panel. Semak URL, token dan id node, dan pastikan mesin ini boleh capai panel: curl -I $(cfg PANEL_URL)"
     chmod 600 "$WINGS_ETC/config.yml" 2>/dev/null || true
-    configure_wings_network
+    # Nota: fungsi ini pernah dinamakan configure_wings_network dan dinamakan
+    # semula semasa logik pemilihan subnet dipindahkan ke dalamnya. Panggilan di
+    # sini terlepas, jadi mod ini mati dengan "command not found".
+    write_wings_network_section "$(cfg WINGS_DOCKER_SUBNET)"
     log_ok "Wings berdaftar dengan panel"
     return 0
 }
