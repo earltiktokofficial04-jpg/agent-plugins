@@ -36,6 +36,11 @@ DISK_CHECK_PATH="/"
 
 is_termux() { [[ "$ENV_KIND" == "termux" ]]; }
 
+# Nama pengguna semasa, dengan nombor uid sebagai ganti bila tiada entri passwd
+# (berlaku pada sesetengah ROM Android). Kosong akan menjadikan setiap
+# perbandingan "adakah kita pemiliknya?" palsu, dan chown gagal senyap.
+current_user() { id -un 2>/dev/null || id -u; }
+
 #---------------------------------------------------------------------------
 # Pengesanan
 #---------------------------------------------------------------------------
@@ -92,8 +97,8 @@ detect_environment() {
         ENV_LABEL="Termux di Android"
         PKG_MGR="pkg"
         SERVICE_MODE="manual"
-        WEB_USER="$(id -un)"
-        WEB_GROUP="$(id -gn)"
+        WEB_USER="$(current_user)"
+        WEB_GROUP="$(id -gn 2>/dev/null || id -g)"
         CAN_DOCKER="no"
         DOCKER_BLOCK_REASON="Android tanpa root tidak mempunyai Docker, cgroups atau namespace yang Wings perlukan"
         SUPPORT_LEVEL="experimental"
@@ -210,6 +215,16 @@ env_adjust_after_detect() {
 # lakukan. Lebih baik memberitahunya sekarang, dengan sebabnya, daripada
 # membiarkan empat fasa Wings gagal satu demi satu kemudian.
 env_enforce_capabilities() {
+    # HTTPS mesti diputuskan DI SINI, bukan dalam phase_ssl — fasa webserver
+    # berjalan lebih awal dan nginx_listen_port memulangkan 80 apabila SSL
+    # diminta. Membiarkannya kepada phase_ssl bermakna nginx sudah cuba
+    # mengikat port istimewa dan gagal sebelum sesiapa menyemaknya.
+    if cfg_is PANEL_SSL yes && ! can_bind_privileged_ports; then
+        CFG[PANEL_SSL]="no"
+        CFG[WINGS_SSL]="no"
+        defer_warning "HTTPS dimatikan: port 80/443 memerlukan root, dan Let's Encrypt perlukan port 80 yang boleh dicapai dari internet. Panel disajikan atas HTTP. Untuk HTTPS, letakkan reverse proxy (contohnya Cloudflare Tunnel) di hadapannya."
+    fi
+
     cfg_is INSTALL_WINGS yes || return 0
     case "$CAN_DOCKER" in
         yes) return 0 ;;
@@ -290,14 +305,28 @@ nginx_enable_site() {
     fi
     local main="$TERMUX_PREFIX/etc/nginx/nginx.conf"
     [[ -f "$main" ]] || return 0
+    mkdir -p "$(dirname "$site")" 2>/dev/null || true
     local body; body="$(cat "$main" 2>/dev/null || true)"
-    [[ "$body" == *"conf.d/*.conf"* ]] && return 0
-    # Sisipkan include tepat selepas baris `http {`, bukan di hujung fail —
-    # `include` di luar blok http ialah ralat sintaks yang menghalang nginx start.
-    awk -v inc="    include conf.d/*.conf;" '
-        { print }
-        !done && /^[[:space:]]*http[[:space:]]*\{/ { print inc; done = 1 }
-    ' "$main" >"$main.ptero" 2>/dev/null && mv "$main.ptero" "$main"
+    [[ "$body" == *"$site"* ]] && return 0
+
+    # Laluan MESTI mutlak. nginx menyelesaikan `include` relatif terhadap prefix
+    # yang dikompil ke dalam binari — pada Termux itu $PREFIX/share/nginx, bukan
+    # direktori nginx.conf ini. `include conf.d/*.conf` akan menunjuk ke folder
+    # yang salah, tidak memuatkan apa-apa, dan tidak mengeluarkan ralat pun:
+    # panel tidak pernah disajikan dan tiada apa yang memberitahu sebabnya.
+    #
+    # Sisipkan tepat selepas baris `http {`, bukan di hujung fail — `include`
+    # di luar blok http ialah ralat sintaks yang menghalang nginx start.
+    local tmp="$main.ptero.$$"
+    if awk -v inc="    include $site;" '
+            { print }
+            !inserted && /^[[:space:]]*http[[:space:]]*\{/ { print inc; inserted = 1 }
+        ' "$main" >"$tmp" 2>/dev/null && [[ -s "$tmp" ]]; then
+        mv "$tmp" "$main"
+    else
+        rm -f "$tmp" 2>/dev/null || true
+        log_warn "Tidak dapat menyuntik include ke $main — tambah sendiri di dalam blok http: include $site;"
+    fi
     return 0
 }
 
@@ -336,6 +365,24 @@ apache_fcgi_handler() {
 # `mysql` langsung, dan kita sudah bukan root — bendera itu akan menggagalkannya.
 db_safe_args() {
     if is_termux; then printf ''; else printf -- '--user=mysql'; fi
+}
+
+# Bolehkah kita mengikat port istimewa (< 1024)? Kernel hanya membenarkannya
+# kepada root atau proses dengan CAP_NET_BIND_SERVICE. Android tidak memberi
+# kedua-duanya kepada aplikasi, jadi port 80 dan 443 memang di luar capaian —
+# bukan sesuatu yang boleh dicuba dan diharap berjaya.
+can_bind_privileged_ports() {
+    [[ "$IS_ROOT" == "yes" ]] && return 0
+    return 1
+}
+
+# Port HTTP lalai yang benar-benar boleh diikat di sini.
+default_http_port() {
+    if can_bind_privileged_ports; then
+        cfg_is PANEL_SSL yes && printf '443' || printf '80'
+    else
+        printf '8080'
+    fi
 }
 
 php_fpm_listening() {
@@ -445,7 +492,7 @@ pkg_installed() {
 # tidak pernah gagal — pemilikan yang tidak dapat ditukar bukan sebab untuk
 # membatalkan pemasangan.
 chown_web() {
-    [[ "$WEB_USER" == "$(id -un)" ]] && return 0
+    [[ "$WEB_USER" == "$(current_user)" ]] && return 0
     local -a opts=()
     while [[ $# -gt 0 && "$1" == -* ]]; do
         opts+=("$1"); shift

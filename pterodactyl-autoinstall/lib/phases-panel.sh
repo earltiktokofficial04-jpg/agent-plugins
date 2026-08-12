@@ -126,7 +126,7 @@ phase_panel_files() {
     # Panel ~150MB, vendor ~250MB, cache composer ~300MB, ruang kerja tar.
     local free; free="$(disk_mb)"
     if (( free < 1536 )); then
-        die "Ruang kosong pada / hanya ${free}MB. Muat turun dan composer memerlukan sekurang-kurangnya 1.5GB, dan disk yang penuh separuh jalan meninggalkan pemasangan yang rosak. Kosongkan ruang dahulu."
+        die "Ruang kosong pada $DISK_CHECK_PATH hanya ${free}MB. Muat turun dan composer memerlukan sekurang-kurangnya 1.5GB, dan disk yang penuh separuh jalan meninggalkan pemasangan yang rosak. Kosongkan ruang dahulu."
     fi
 
     attempt "Fail panel" verify_panel_files \
@@ -434,7 +434,14 @@ NGINX
 # Port yang nginx patut dengar sekarang. Certbot akan menambah 443 sendiri,
 # jadi semasa pemasangan awal SSL kita mula pada port 80.
 nginx_listen_port() {
-    if cfg_is PANEL_SSL yes; then printf '80'; else printf '%s' "$(cfg PANEL_HTTP_PORT)"; fi
+    # Port 80 hanya bermakna kalau kita boleh mengikatnya. env_enforce_capabilities
+    # sepatutnya sudah mematikan SSL bila tidak; syarat kedua di sini supaya
+    # tiada laluan panggilan yang boleh memaksa 80 secara senyap.
+    if cfg_is PANEL_SSL yes && can_bind_privileged_ports; then
+        printf '80'
+    else
+        printf '%s' "$(cfg PANEL_HTTP_PORT)"
+    fi
 }
 
 verify_webserver() {
@@ -601,6 +608,16 @@ phase_ssl() {
         log_skip "HTTPS tidak diminta — dilangkau"
         return 0
     fi
+    # Let's Encrypt tidak boleh berfungsi tanpa port 80 yang boleh diikat dan
+    # dicapai dari internet. Pada Android tiada satu pun: port istimewa
+    # terlarang, tiada certbot dalam repo Termux, dan telefon tidak mempunyai
+    # DNS awam yang menunjuk kepadanya. Mencuba empat strategi di sini hanya
+    # membuang masa untuk sampai ke kesimpulan yang sama.
+    if ! can_bind_privileged_ports; then
+        CFG[PANEL_SSL]="no"
+        defer_warning "HTTPS dilangkau: port 80/443 memerlukan root, dan Let's Encrypt perlukan port 80 yang boleh dicapai. Panel disajikan atas HTTP pada port $(cfg PANEL_HTTP_PORT). Untuk HTTPS, letakkan reverse proxy (Cloudflare Tunnel atau serupa) di hadapannya."
+        return 0
+    fi
 
     # Semakan awal yang menjimatkan masa: kalau DNS tidak menunjuk ke sini,
     # Let's Encrypt PASTI gagal. Beritahu sebabnya, jangan buang 3 cubaan.
@@ -628,9 +645,12 @@ phase_ssl() {
     # lebih berguna daripada pemasangan yang terhenti.
     CFG[PANEL_SSL]="no"
     CFG[WINGS_SSL]="no"
-    CFG[PANEL_HTTP_PORT]="80"
+    # Turun ke HTTP pada port yang benar-benar boleh diikat. Menetapkan 80 tanpa
+    # syarat akan memusnahkan pemasangan yang berfungsi pada sistem yang tidak
+    # boleh mengikat port istimewa: nginx berhenti mendengar sepenuhnya.
+    can_bind_privileged_ports && CFG[PANEL_HTTP_PORT]="80"
     env_set APP_URL "$(panel_url)" || true
-    write_nginx_conf 80 || true
+    write_nginx_conf "$(nginx_listen_port)" || true
     if [[ "$HAS_SYSTEMD" == "yes" ]]; then systemctl reload nginx || true; else nginx -s reload || true; fi
     defer_warning "Sijil HTTPS tidak dapat diperoleh selepas 3 kaedah. Panel diteruskan atas HTTP di $(panel_url). Punca biasa: port 80 tersekat dari internet, atau DNS belum betul. Selepas dibetulkan jalankan: certbot --nginx -d $(cfg PANEL_FQDN)"
     return 0
@@ -687,9 +707,11 @@ services_fallback_runner() {
 # kepadanya) — di sana gelung dalam pterodactyl-services yang menjalankannya.
 install_scheduler_cron() {
     local line="* * * * * php $PANEL_DIR/artisan schedule:run >> /dev/null 2>&1"
-    have crontab || return 1
 
-    # cron.d membenarkan medan pengguna secara jelas — itu pilihan pertama.
+    # cron.d membenarkan medan pengguna secara jelas — itu pilihan pertama, dan
+    # ia hanya perlu menulis fail. JANGAN letak `have crontab` sebelum ini:
+    # imej minimal ada /etc/cron.d dan daemon cron tanpa binari `crontab`, dan
+    # menuntutnya di sini akan menolak laluan yang sebenarnya berfungsi.
     if [[ -d /etc/cron.d && "$IS_ROOT" == "yes" ]]; then
         if printf '* * * * * %s php %s/artisan schedule:run >> /dev/null 2>&1\n' "$WEB_USER" "$PANEL_DIR" \
             >/etc/cron.d/pterodactyl 2>/dev/null; then
@@ -697,6 +719,10 @@ install_scheduler_cron() {
             return 0
         fi
     fi
+
+    # Selebihnya memerlukan binari crontab.
+    have crontab || return 1
+
     # Fallback: crontab pengguna web sendiri.
     if { crontab -u "$WEB_USER" -l 2>/dev/null | grep -v 'artisan schedule:run' || true
          printf '%s\n' "$line"; } | crontab -u "$WEB_USER" - 2>/dev/null; then
@@ -705,7 +731,7 @@ install_scheduler_cron() {
     # Fallback terakhir: crontab pengguna semasa. Kalau itu root, tetap turun
     # ke pengguna web; kalau bukan (Termux), kita memang pemiliknya.
     local own_line="$line"
-    [[ "$WEB_USER" != "$(id -un)" ]] && have sudo \
+    [[ "$WEB_USER" != "$(current_user)" ]] && have sudo \
         && own_line="* * * * * sudo -u $WEB_USER php $PANEL_DIR/artisan schedule:run >> /dev/null 2>&1"
     if { crontab -l 2>/dev/null | grep -v 'artisan schedule:run' || true
          printf '%s\n' "$own_line"; } | crontab - 2>/dev/null; then
@@ -738,7 +764,7 @@ mkdir -p "\$LOG_DIR" 2>/dev/null || true
 # "nohup: failed to run command 'as_web'" dan queue worker tidak pernah bermula.
 #
 # Bila kita SUDAH pengguna web (Termux), tiada apa yang perlu diturunkan.
-if [ "\$WEB_USER" = "\$(id -un)" ]; then
+if [ "\$WEB_USER" = "\$(id -un 2>/dev/null || id -u)" ]; then
     RUNAS=""
 elif command -v sudo >/dev/null 2>&1; then
     RUNAS="sudo -u \$WEB_USER"

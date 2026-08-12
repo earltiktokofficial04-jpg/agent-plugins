@@ -130,6 +130,8 @@ Perkara yang benar-benar bertukar apabila persekitaran bertukar:
 | Scheduler | `/etc/cron.d` sebagai `www-data` | gelung dalam `pterodactyl-services` |
 | Swap sementara | dicipta untuk composer | dilangkau — Android larang `swapon` |
 | Firewall | ufw + fail2ban | dilangkau — tiada akses netfilter |
+| Port panel | 80, atau 443 dengan SSL | 8080 — port < 1024 perlukan root |
+| HTTPS | Let's Encrypt automatik | dimatikan — perlukan port 80 yang boleh dicapai |
 | Semakan root | wajib | dilangkau |
 
 ### Termux — apa yang jujur
@@ -268,7 +270,14 @@ worker ke pelancar tanpa systemd; dan gelung subnet mencuba 172.19 hingga
 dan shellcheck bersih pada semua sembilan fail; dry-run sebenar dijalankan dua
 kali, sekali sebagai container Docker dan sekali dengan Termux disimulasikan
 (`TERMUX_VERSION` + `PREFIX`), dan disahkan bahawa setiap fail yang ditulis
-mendarat di bawah `$PREFIX`; pemetaan nama pakej diuji unit untuk 19 nama.
+mendarat di bawah `$PREFIX`; pemetaan nama pakej diuji unit untuk 19 nama; suntikan
+`include` nginx dijalankan sebenar terhadap `nginx.conf` contoh dan disemak
+idempoten; `install_scheduler_cron` dijalankan sebenar pada sistem tanpa binari
+`crontab` (container ini) untuk mengesahkan laluan cron.d; keseluruhan dry-run
+dijalankan **sebagai pengguna bukan-root sebenar** dengan Termux disimulasikan,
+mengesahkan port 8080, HTTPS dimatikan dengan sebabnya, dan kredential mendarat
+dalam `$HOME`; skrip `pterodactyl-services` yang dijana disemak sintaks dan
+dibandingkan antara laluan Termux dan Linux biasa.
 Yang **tidak** diuji ialah pemasangan Termux sebenar pada telefon Android.
 
 **Tidak diuji secara langsung:** mod `--upgrade`, `--backup`, `--restore`,
@@ -309,6 +318,22 @@ semula untuk menolak yang palsu. Antara pepijat sebenar yang ditemui dan dibaiki
   ia melaporkan "bare metal" dan akan memasang Wings di tempat yang mungkin
   tidak boleh menjalankannya. `systemd-detect-virt --container` tahu; ia kini
   ditanya sebagai kaedah terakhir.
+- `include conf.d/*.conf` diselesaikan oleh nginx terhadap prefix yang
+  **dikompil ke dalam binari**, bukan terhadap direktori `nginx.conf`. Pada
+  Termux itu folder yang salah, glob yang tidak padan bukan ralat, dan nginx
+  start dengan gembira tanpa memuatkan vhost panel — tiada apa yang memberitahu
+  sebabnya. Laluan mutlak sekarang.
+- Port < 1024 memerlukan root. Pemasang memilih 80/443 tanpa syarat, jadi pada
+  Android nginx gagal mengikat dua kali sebelum strategi ketiga membetulkannya,
+  dan fallback HTTPS **menetapkan semula port ke 80** — memusnahkan pemasangan
+  yang sudah berfungsi. Keupayaan itu kini disemak sebelum port dipilih, dan
+  keputusan HTTPS dibuat sebelum fasa webserver, bukan selepasnya.
+- Memindahkan `have crontab` ke puncak `install_scheduler_cron` (kemas, semasa
+  menukar `www-data` kepada `$WEB_USER`) memecahkan laluan `/etc/cron.d` yang
+  hanya perlu **menulis fail**. Imej minimal ada cron.d tanpa binari `crontab`.
+  Regresi yang saya sendiri masukkan, ditangkap kemudian.
+- `id -un` gagal bila uid tiada entri passwd. `WEB_USER` kosong menjadikan
+  setiap semakan "adakah kita pemiliknya?" palsu dan setiap `chown` gagal senyap.
 - Percubaan pertama saya membaiki perkara di atas menetapkan `CAN_DOCKER=no`
   untuk semua container — yang akan **menolak pemasangan yang sudah terbukti
   berjaya** dalam ujian hujung-ke-hujung, kerana Docker-dalam-Docker memang

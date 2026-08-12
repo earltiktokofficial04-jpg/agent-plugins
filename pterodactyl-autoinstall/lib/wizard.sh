@@ -189,8 +189,15 @@ wizard() {
         "$ip_guess" host \
         "Kalau kau ada domain yang sudah point ke server ini, guna domain (cth panel.domain.com) supaya HTTPS boleh dipasang."
 
-    # 2 — SSL, hanya bermakna bila alamatnya domain
-    if is_ip_literal "$(cfg PANEL_FQDN)"; then
+    # 2 — SSL, hanya bermakna bila alamatnya domain DAN kita boleh mengikat
+    # port 80. Bertanya soalan yang hanya ada satu jawapan sah adalah
+    # memperbodohkan pengguna.
+    if ! can_bind_privileged_ports; then
+        CFG[PANEL_SSL]="no"
+        printf '\n  %s↷ HTTPS dilangkau: port 80/443 memerlukan root.%s\n' "$C_DIM" "$C_OFF"
+        printf '  %s  Let'"'"'s Encrypt perlukan port 80 yang boleh dicapai untuk mengesahkan%s\n' "$C_DIM" "$C_OFF"
+        printf '  %s  domain. Guna reverse proxy di hadapan panel kalau kau mahu HTTPS.%s\n' "$C_DIM" "$C_OFF"
+    elif is_ip_literal "$(cfg PANEL_FQDN)"; then
         CFG[PANEL_SSL]="no"
         printf '\n  %s↷ Alamat yang kau beri ialah IP, jadi HTTPS dilangkau.%s\n' "$C_DIM" "$C_OFF"
         printf '  %s  Let'"'"'s Encrypt tidak mengeluarkan sijil untuk alamat IP.%s\n' "$C_DIM" "$C_OFF"
@@ -282,10 +289,12 @@ autofill() {
     }
 
     # Port panel: 443 bila SSL, jika tidak 80 — tetapi elak port yang sudah
-    # diguna proses lain supaya nginx tidak gagal start.
+    # diguna proses lain supaya nginx tidak gagal start. Tanpa keupayaan
+    # mengikat port istimewa (Android), 80 dan 443 bukan pilihan sama sekali:
+    # memilihnya bermakna dua strategi webserver gagal dahulu sebelum yang
+    # ketiga membetulkannya, dan rancangan menunjukkan URL yang salah.
     if [[ -z "$(cfg PANEL_HTTP_PORT)" ]]; then
-        local want
-        cfg_is PANEL_SSL yes && want=443 || want=80
+        local want; want="$(default_http_port)"
         if port_busy "$want" && [[ "$(port_owner "$want")" != *nginx* ]]; then
             local alt; alt="$(next_free_port 8080 || printf '')"
             if [[ -n "$alt" ]]; then
