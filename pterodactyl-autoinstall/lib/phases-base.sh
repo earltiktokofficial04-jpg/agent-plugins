@@ -53,16 +53,16 @@ ensure_cron_running() {
 
 phase_deps() {
     repair_dpkg_if_broken
-    apt_update || log_warn "apt update tidak bersih — teruskan dan lihat sama ada pakej masih boleh dipasang"
+    pkg_update || log_warn "apt update tidak bersih — teruskan dan lihat sama ada pakej masih boleh dipasang"
 
     # Pasang seberapa banyak yang boleh. Kalau kumpulan penuh gagal (satu pakej
     # tiada pada release ini), pasang satu-satu supaya yang lain tetap masuk.
-    if ! run apt_install "${BASE_PKGS[@]}"; then
+    if ! run pkg_install "${BASE_PKGS[@]}"; then
         log_warn "Pemasangan berkelompok gagal — cuba satu demi satu"
         local p
         for p in "${BASE_PKGS[@]}"; do
-            apt_installed "$p" && continue
-            run apt_install "$p" || log_warn "pakej '$p' tidak dapat dipasang — diteruskan tanpanya"
+            pkg_installed "$p" && continue
+            run pkg_install "$p" || log_warn "pakej '$p' tidak dapat dipasang — diteruskan tanpanya"
         done
     fi
 
@@ -100,13 +100,21 @@ verify_php() {
     v="$(php_active_version)" || return 1
     case "$v" in
         8.2|8.3|8.4) : ;;
-        *) return 1 ;;
+        # Termux menghantar satu pakej `php` sahaja — tiada pilihan versi untuk
+        # dibuat, jadi menolak apa yang ada bermakna menolak Termux sepenuhnya.
+        8.*) is_termux || return 1 ;;
+        *)   return 1 ;;
     esac
     mods="$(php -m 2>/dev/null || true)"
     for e in "${PHP_EXT_NEEDED[@]}"; do
         [[ "$mods" == *"$e"* ]] || return 1
     done
-    [[ -x "/usr/sbin/php-fpm$v" ]] || have "php-fpm$v" || return 1
+    # Debian menamakan binari mengikut versi; Termux tidak.
+    if is_termux; then
+        have php-fpm || return 1
+    else
+        [[ -x "/usr/sbin/php-fpm$v" ]] || have "php-fpm$v" || return 1
+    fi
     PHP_V="$v"
     state_put php-version "$v"
     return 0
@@ -116,9 +124,9 @@ STRATEGY_DESC["php_from_configured_repos"]="repo yang sudah dikonfigurasi"
 php_from_configured_repos() {
     local v
     for v in 8.3 8.2; do
-        if apt_available "php$v-cli"; then
+        if pkg_available "php$v-cli"; then
             # shellcheck disable=SC2046
-            apt_install $(php_pkg_list "$v") && return 0
+            pkg_install $(php_pkg_list "$v") && return 0
         fi
     done
     return 1
@@ -137,7 +145,7 @@ php_via_ondrej() {
         printf 'deb [signed-by=/usr/share/keyrings/ondrej-php.gpg] https://ppa.launchpadcontent.net/ondrej/php/ubuntu %s main\n' \
             "$OS_CODENAME" >/etc/apt/sources.list.d/ondrej-php.list
     fi
-    apt_update || return 1
+    pkg_update || return 1
     php_from_configured_repos
 }
 
@@ -150,7 +158,7 @@ php_via_sury() {
     local base="https://packages.sury.org/php/"
     printf 'deb [signed-by=/usr/share/keyrings/sury-php.gpg] %s %s main\n' "$base" "$suite" \
         >/etc/apt/sources.list.d/sury-php.list
-    apt_update || return 1
+    pkg_update || return 1
     php_from_configured_repos
 }
 
@@ -158,10 +166,10 @@ STRATEGY_DESC["php_any_available"]="apa-apa PHP 8.x yang ada"
 php_any_available() {
     local v
     for v in 8.4 8.1; do
-        if apt_available "php$v-cli"; then
+        if pkg_available "php$v-cli"; then
             log_warn "Guna PHP $v — upstream Pterodactyl menyokong 8.2/8.3, jadi ini di luar julat yang diuji"
             # shellcheck disable=SC2046
-            apt_install $(php_pkg_list "$v") && return 0
+            pkg_install $(php_pkg_list "$v") && return 0
         fi
     done
     return 1
@@ -171,11 +179,26 @@ STRATEGY_DESC["php_repair_broken"]="baiki pakej PHP yang separuh terpasang"
 php_repair_broken() {
     apt_q --fix-broken install -y -qq || true
     dpkg --configure -a || true
-    apt_update || true
+    pkg_update || true
     php_from_configured_repos
 }
 
+STRATEGY_DESC["php_termux"]="pakej php + php-fpm Termux"
+php_termux() {
+    is_termux || return 1
+    pkg_install php php-fpm || pkg_install php || return 1
+    hash -r 2>/dev/null || true
+    verify_php
+}
+
 phase_php() {
+    if is_termux; then
+        attempt "PHP dengan semua sambungan" verify_php php_termux \
+            || die "PHP Termux tidak mempunyai semua sambungan yang panel perlukan ($(printf '%s ' "${PHP_EXT_NEEDED[@]}")). Semak dengan: php -m. Repo Termux tidak menyediakan pakej per-sambungan, jadi ini had platform — panel tidak boleh berjalan tanpanya."
+        log_ok "PHP $PHP_V sedia (Termux)"
+        return 0
+    fi
+
     attempt "PHP 8.2/8.3 dengan semua sambungan" verify_php \
         php_from_configured_repos \
         php_via_ondrej \
@@ -208,23 +231,27 @@ composer_official_installer() {
         rm -rf "$tmp"
         return 1
     fi
-    php "$tmp/installer" --install-dir=/usr/local/bin --filename=composer
+    mkdir -p "$BIN_DIR" 2>/dev/null || true
+    php "$tmp/installer" --install-dir="$BIN_DIR" --filename=composer
     local rc=$?
     rm -rf "$tmp"
+    hash -r 2>/dev/null || true
     return $rc
 }
 
 STRATEGY_DESC["composer_phar_direct"]="composer.phar terus daripada getcomposer.org"
 composer_phar_direct() {
-    curl -fsSL --max-time 120 -o /usr/local/bin/composer https://getcomposer.org/composer-stable.phar || return 1
-    chmod +x /usr/local/bin/composer
+    mkdir -p "$BIN_DIR" 2>/dev/null || true
+    curl -fsSL --max-time 120 -o "$BIN_DIR/composer" https://getcomposer.org/composer-stable.phar || return 1
+    chmod +x "$BIN_DIR/composer"
+    hash -r 2>/dev/null || true
     composer --version >/dev/null 2>&1
 }
 
 STRATEGY_DESC["composer_from_distro"]="pakej composer daripada repo distro"
 composer_from_distro() {
-    apt_available composer || return 1
-    apt_install composer
+    pkg_available composer || return 1
+    pkg_install composer
 }
 
 phase_composer() {
@@ -259,13 +286,13 @@ node_via_nodesource() {
     curl -fsSL --max-time 120 "https://deb.nodesource.com/setup_${major}.x" -o "$f" || { rm -f "$f"; return 1; }
     bash "$f" || { rm -f "$f"; return 1; }
     rm -f "$f"
-    apt_install nodejs
+    pkg_install nodejs
 }
 
 STRATEGY_DESC["node_from_distro"]="pakej nodejs daripada repo distro"
 node_from_distro() {
-    apt_available nodejs || return 1
-    apt_install nodejs npm || apt_install nodejs || return 1
+    pkg_available nodejs || return 1
+    pkg_install nodejs npm || pkg_install nodejs || return 1
     verify_nodejs
 }
 
@@ -325,15 +352,15 @@ verify_python() {
 
 STRATEGY_DESC["python_from_distro"]="python3 daripada repo distro"
 python_from_distro() {
-    apt_install python3 python3-pip python3-venv python3-dev || \
-        apt_install python3 python3-venv || return 1
+    pkg_install python3 python3-pip python3-venv python3-dev || \
+        pkg_install python3 python3-venv || return 1
     verify_python
 }
 
 STRATEGY_DESC["python_full_meta"]="pakej python3-full"
 python_full_meta() {
-    apt_available python3-full || return 1
-    apt_install python3-full
+    pkg_available python3-full || return 1
+    pkg_install python3-full
 }
 
 STRATEGY_DESC["python_via_deadsnakes"]="PPA deadsnakes (Ubuntu)"
@@ -341,11 +368,11 @@ python_via_deadsnakes() {
     [[ "$OS_ID" == "ubuntu" ]] || return 1
     have add-apt-repository || return 1
     add-apt-repository -y ppa:deadsnakes/ppa || return 1
-    apt_update || return 1
+    pkg_update || return 1
     local v
     for v in 3.12 3.11 3.10; do
-        if apt_available "python$v"; then
-            apt_install "python$v" "python$v-venv" "python$v-dev" || continue
+        if pkg_available "python$v"; then
+            pkg_install "python$v" "python$v-venv" "python$v-dev" || continue
             return 0
         fi
     done
@@ -371,7 +398,7 @@ phase_python() {
             [[ -f "$d" ]] && { marker="$d"; break; }
         done
         if [[ -n "$marker" ]]; then
-            apt_available pipx && run apt_install pipx || true
+            pkg_available pipx && run pkg_install pipx || true
             log_info "Python ini externally-managed (PEP 668) — guna venv atau pipx untuk pasang pakej, jangan pip system-wide"
         fi
     else
@@ -394,27 +421,51 @@ db_cli() {
 STRATEGY_DESC["db_install_mariadb"]="mariadb-server daripada repo distro"
 db_install_mariadb() {
     if ! have mariadbd && ! have mysqld; then
-        apt_install mariadb-server mariadb-client || return 1
+        pkg_install mariadb-server mariadb-client || return 1
     fi
     db_start_server
 }
 
 STRATEGY_DESC["db_install_mysql"]="mysql-server sebagai ganti"
 db_install_mysql() {
-    apt_available mysql-server || return 1
-    apt_install mysql-server || return 1
+    pkg_available mysql-server || return 1
+    pkg_install mysql-server || return 1
     db_start_server
+}
+
+# Pada Debian, postinst pakej mencipta jadual sistem. Termux tidak mempunyai
+# postinst yang berbuat demikian, jadi mariadbd bermula, tidak menjumpai
+# direktori data, dan mati serta-merta dengan ralat yang tidak menyebut sebabnya.
+db_init_datadir_if_needed() {
+    is_termux || return 0
+    local datadir="$TERMUX_PREFIX/var/lib/mysql"
+    [[ -d "$datadir/mysql" ]] && return 0
+    if have mariadb-install-db; then
+        run mariadb-install-db --auth-root-authentication-method=normal || \
+            run mariadb-install-db || return 1
+    elif have mysql_install_db; then
+        run mysql_install_db || return 1
+    else
+        return 1
+    fi
+    return 0
 }
 
 db_start_server() {
     mkdir -p /run/mysqld /var/run/mysqld 2>/dev/null || true
     chown mysql:mysql /run/mysqld 2>/dev/null || true
+    db_init_datadir_if_needed || log_warn "Direktori data MariaDB tidak dapat dimulakan"
+
     local unit="mariadb"
     [[ -f /lib/systemd/system/mysql.service || -f /usr/lib/systemd/system/mysql.service ]] && unit="mysql"
+    # `--user=mysql` betul apabila kita root dan pengguna itu wujud. Pada Termux
+    # tiada pengguna `mysql` dan kita bukan root — bendera itu menghalang start.
+    local -a safe_args=()
+    [[ -n "$(db_safe_args)" ]] && safe_args=(--user=mysql)
     if have mariadbd-safe; then
-        svc_up "$unit" mariadbd mariadbd-safe --user=mysql
+        svc_up "$unit" mariadbd mariadbd-safe ${safe_args[@]+"${safe_args[@]}"}
     elif have mysqld_safe; then
-        svc_up "$unit" mysqld mysqld_safe --user=mysql
+        svc_up "$unit" mysqld mysqld_safe ${safe_args[@]+"${safe_args[@]}"}
     else
         svc_up "$unit" mysqld
     fi
@@ -423,7 +474,7 @@ db_start_server() {
 
 STRATEGY_DESC["db_reset_socket_dir"]="cipta semula direktori socket dan mula semula"
 db_reset_socket_dir() {
-    mkdir -p /run/mysqld && chown mysql:mysql /run/mysqld
+    mkdir -p /run/mysqld 2>/dev/null && chown mysql:mysql /run/mysqld 2>/dev/null || true
     if [[ "$HAS_SYSTEMD" == "yes" ]]; then
         systemctl restart mariadb 2>/dev/null || systemctl restart mysql 2>/dev/null || true
     fi
@@ -556,7 +607,7 @@ redis_server_args() {
 
 STRATEGY_DESC["redis_install_and_start"]="redis-server daripada repo distro"
 redis_install_and_start() {
-    have redis-server || apt_install redis-server redis-tools || apt_install redis-server || return 1
+    have redis-server || pkg_install redis-server redis-tools || pkg_install redis-server || return 1
     if [[ -n "$(cfg REDIS_PASSWORD)" ]]; then
         # svc_up mungkin menyerahkan kepada systemd, yang membaca fail config —
         # jadi tuliskan password ke situ juga, bukan hanya ke argumen.

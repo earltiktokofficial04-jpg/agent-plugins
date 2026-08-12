@@ -83,7 +83,7 @@ composer_install_plain() {
 
 STRATEGY_DESC["composer_install_prefer_source"]="composer install --prefer-source (guna git, elak had kadar dist GitHub)"
 composer_install_prefer_source() {
-    have git || apt_install git || return 1
+    have git || pkg_install git || return 1
     _composer_run install --no-dev --optimize-autoloader --prefer-source
 }
 
@@ -134,8 +134,8 @@ phase_panel_files() {
         || die "Tidak dapat memuat turun panel. Semak sambungan ke github.com."
 
     # 750, bukan 755: storage/logs mengandungi jejak ralat Laravel yang boleh
-    # membocorkan maklumat, dan hanya www-data perlu membacanya.
-    chown -R www-data:www-data "$PANEL_DIR/storage" "$PANEL_DIR/bootstrap/cache" 2>/dev/null || true
+    # membocorkan maklumat, dan hanya pengguna web perlu membacanya.
+    chown_web -R "$PANEL_DIR/storage" "$PANEL_DIR/bootstrap/cache"
     chmod -R 750 "$PANEL_DIR/storage" "$PANEL_DIR/bootstrap/cache" 2>/dev/null || true
 
     # Composer menyusun keseluruhan graf kebergantungan dalam ingatan. Pada VPS
@@ -242,7 +242,7 @@ phase_panel_env() {
     [[ -f "$PANEL_DIR/.env" ]] || cp "$PANEL_DIR/.env.example" "$PANEL_DIR/.env"
     # .env memegang APP_KEY dan password pangkalan data. .env.example datang
     # dengan 0644, jadi kunci sebelum apa-apa rahsia ditulis ke dalamnya.
-    chown www-data:www-data "$PANEL_DIR/.env" 2>/dev/null || true
+    chown_web "$PANEL_DIR/.env"
     chmod 600 "$PANEL_DIR/.env" 2>/dev/null || true
     grep -qE '^APP_KEY=base64:' "$PANEL_DIR/.env" || art key:generate --force
 
@@ -373,19 +373,21 @@ php_fpm_socket() {
 
 start_php_fpm() {
     mkdir -p /run/php 2>/dev/null || true
-    svc_up "php$PHP_V-fpm" "php-fpm$PHP_V" "php-fpm$PHP_V" --nodaemonize
-    wait_for 20 test -S "$(php_fpm_socket)"
+    local bin; bin="$(php_fpm_bin)"
+    svc_up "php$PHP_V-fpm" "$bin" "$bin" --nodaemonize
+    wait_for 20 php_fpm_listening
     return 0
 }
 
 write_nginx_conf() {
-    local port="$1" sock listen6=""
-    sock="$(php_fpm_socket)"
+    local port="$1" pass listen6=""
+    pass="$(php_fpm_pass)"
     # Banyak VPS mematikan IPv6 sepenuhnya; "listen [::]" akan menyebabkan
     # nginx gagal start terus pada sistem begitu.
     [[ "$HAS_IPV6" == "yes" ]] && listen6="    listen [::]:$port;"
 
-    cat >/etc/nginx/sites-available/pterodactyl.conf <<NGINX
+    mkdir -p "$(dirname "$(nginx_site_path)")" 2>/dev/null || true
+    cat >"$(nginx_site_path)" <<NGINX
 server {
     listen $port;
 $listen6
@@ -394,8 +396,8 @@ $listen6
     root $PANEL_DIR/public;
     index index.php;
 
-    access_log /var/log/nginx/pterodactyl.access.log;
-    error_log  /var/log/nginx/pterodactyl.error.log error;
+    access_log $(nginx_log_dir)/pterodactyl.access.log;
+    error_log  $(nginx_log_dir)/pterodactyl.error.log error;
 
     client_max_body_size 100m;
     client_body_timeout 120s;
@@ -407,7 +409,7 @@ $listen6
 
     location ~ \.php\$ {
         fastcgi_split_path_info ^(.+\.php)(/.+)\$;
-        fastcgi_pass unix:$sock;
+        fastcgi_pass $pass;
         fastcgi_index index.php;
         include fastcgi_params;
         fastcgi_param PHP_VALUE "upload_max_filesize = 100M \n post_max_size=100M";
@@ -424,9 +426,8 @@ $listen6
     location ~ /\.ht { deny all; }
 }
 NGINX
-    mkdir -p /etc/nginx/sites-enabled
-    ln -sf /etc/nginx/sites-available/pterodactyl.conf /etc/nginx/sites-enabled/pterodactyl.conf
-    rm -f /etc/nginx/sites-enabled/default
+    mkdir -p "$(nginx_log_dir)" 2>/dev/null || true
+    nginx_enable_site
     return 0
 }
 
@@ -446,8 +447,8 @@ verify_webserver() {
 
 STRATEGY_DESC["web_nginx"]="nginx + PHP-FPM"
 web_nginx() {
-    have nginx || apt_install nginx || return 1
-    chown -R www-data:www-data "$PANEL_DIR" 2>/dev/null || true
+    have nginx || pkg_install nginx || return 1
+    chown_web -R "$PANEL_DIR"
     start_php_fpm
     write_nginx_conf "$(nginx_listen_port)"
     nginx -t >>"$LOG_FILE" 2>&1 || return 1
@@ -480,8 +481,8 @@ web_nginx_alt_port() {
 
 STRATEGY_DESC["web_apache"]="Apache + mod_proxy_fcgi"
 web_apache() {
-    apt_available apache2 || return 1
-    apt_install apache2 || return 1
+    pkg_available apache2 || return 1
+    pkg_install apache2 || return 1
     a2enmod proxy_fcgi setenvif rewrite >>"$LOG_FILE" 2>&1 || true
     a2enconf "php$PHP_V-fpm" >>"$LOG_FILE" 2>&1 || true
     start_php_fpm
@@ -496,7 +497,7 @@ web_apache() {
         AllowOverride all
     </Directory>
     <FilesMatch \\.php\$>
-        SetHandler "proxy:unix:$(php_fpm_socket)|fcgi://localhost/"
+        SetHandler "$(apache_fcgi_handler)"
     </FilesMatch>
 </VirtualHost>
 APACHE
@@ -548,7 +549,7 @@ phase_webserver() {
 verify_ssl_cert() {
     [[ -d "/etc/letsencrypt/live/$(cfg PANEL_FQDN)" ]] || return 1
     local vhost
-    for vhost in /etc/nginx/sites-available/pterodactyl.conf \
+    for vhost in "$(nginx_site_path)" \
                  /etc/apache2/sites-available/pterodactyl.conf; do
         [[ -f "$vhost" ]] || continue
         grep -qE 'ssl_certificate|SSLCertificateFile' "$vhost" && return 0
@@ -568,7 +569,7 @@ ssl_reinstall_existing() {
 
 STRATEGY_DESC["ssl_certbot_nginx"]="certbot dengan plugin nginx"
 ssl_certbot_nginx() {
-    have certbot || apt_install certbot python3-certbot-nginx || return 1
+    have certbot || pkg_install certbot python3-certbot-nginx || return 1
     certbot --nginx -d "$(cfg PANEL_FQDN)" --non-interactive --agree-tos \
         --redirect -m "$(cfg SSL_EMAIL)" >>"$LOG_FILE" 2>&1
 }
@@ -649,10 +650,10 @@ Description=Pterodactyl Queue Worker
 After=redis-server.service
 
 [Service]
-User=www-data
-Group=www-data
+User=$WEB_USER
+Group=$WEB_GROUP
 Restart=always
-ExecStart=/usr/bin/php $PANEL_DIR/artisan queue:work --queue=high,standard,low --sleep=3 --tries=3
+ExecStart=$(command -v php || printf '/usr/bin/php') $PANEL_DIR/artisan queue:work --queue=high,standard,low --sleep=3 --tries=3
 StartLimitInterval=180
 StartLimitBurst=30
 RestartSec=5s
@@ -672,78 +673,99 @@ UNIT
 STRATEGY_DESC["services_fallback_runner"]="script pelancar tanpa systemd"
 services_fallback_runner() {
     write_fallback_runner
-    /usr/local/bin/pterodactyl-services start >>"$LOG_FILE" 2>&1 || true
+    "$BIN_DIR/pterodactyl-services" start >>"$LOG_FILE" 2>&1 || true
     wait_for 15 verify_queue_worker
 }
 
-# Scheduler dijalankan sebagai www-data, BUKAN root. Seluruh $PANEL_DIR dimiliki
-# www-data, jadi cron root yang melaksanakan artisan dari situ bermakna sesiapa
-# yang menguasai proses web boleh menulis artisan dan mendapat root pada minit
-# berikutnya. Upstream mendokumenkan versi root; ini versi yang lebih selamat.
+# Scheduler dijalankan sebagai pengguna web, BUKAN root. Seluruh $PANEL_DIR
+# dimiliki pengguna itu, jadi cron root yang melaksanakan artisan dari situ
+# bermakna sesiapa yang menguasai proses web boleh menulis artisan dan mendapat
+# root pada minit berikutnya. Upstream mendokumenkan versi root; ini lebih
+# selamat.
+#
+# Pada Termux tiada cron langsung (dan tiada pengguna lain untuk diturunkan
+# kepadanya) — di sana gelung dalam pterodactyl-services yang menjalankannya.
 install_scheduler_cron() {
     local line="* * * * * php $PANEL_DIR/artisan schedule:run >> /dev/null 2>&1"
+    have crontab || return 1
+
     # cron.d membenarkan medan pengguna secara jelas — itu pilihan pertama.
-    if [[ -d /etc/cron.d ]]; then
-        if printf '* * * * * www-data php %s/artisan schedule:run >> /dev/null 2>&1\n' "$PANEL_DIR" \
+    if [[ -d /etc/cron.d && "$IS_ROOT" == "yes" ]]; then
+        if printf '* * * * * %s php %s/artisan schedule:run >> /dev/null 2>&1\n' "$WEB_USER" "$PANEL_DIR" \
             >/etc/cron.d/pterodactyl 2>/dev/null; then
             chmod 644 /etc/cron.d/pterodactyl 2>/dev/null || true
             return 0
         fi
     fi
-    # Fallback: crontab www-data sendiri.
-    if have crontab; then
-        if { crontab -u www-data -l 2>/dev/null | grep -v 'artisan schedule:run' || true
-             printf '%s\n' "$line"; } | crontab -u www-data - 2>/dev/null; then
-            return 0
-        fi
-        # Fallback terakhir: crontab root, tetapi tetap turun ke www-data.
-        if { crontab -l 2>/dev/null | grep -v 'artisan schedule:run' || true
-             printf '* * * * * sudo -u www-data php %s/artisan schedule:run >> /dev/null 2>&1\n' "$PANEL_DIR"; } \
-             | crontab - 2>/dev/null; then
-            return 0
-        fi
+    # Fallback: crontab pengguna web sendiri.
+    if { crontab -u "$WEB_USER" -l 2>/dev/null | grep -v 'artisan schedule:run' || true
+         printf '%s\n' "$line"; } | crontab -u "$WEB_USER" - 2>/dev/null; then
+        return 0
+    fi
+    # Fallback terakhir: crontab pengguna semasa. Kalau itu root, tetap turun
+    # ke pengguna web; kalau bukan (Termux), kita memang pemiliknya.
+    local own_line="$line"
+    [[ "$WEB_USER" != "$(id -un)" ]] && have sudo \
+        && own_line="* * * * * sudo -u $WEB_USER php $PANEL_DIR/artisan schedule:run >> /dev/null 2>&1"
+    if { crontab -l 2>/dev/null | grep -v 'artisan schedule:run' || true
+         printf '%s\n' "$own_line"; } | crontab - 2>/dev/null; then
+        return 0
     fi
     return 1
 }
 
 write_fallback_runner() {
-    cat >/usr/local/bin/pterodactyl-services <<RUNNER
+    local runner="$BIN_DIR/pterodactyl-services"
+    local logdir; logdir="$(log_root)"
+    mkdir -p "$BIN_DIR" 2>/dev/null || true
+    cat >"$runner" <<RUNNER
 #!/usr/bin/env bash
 # Pelancar service Pterodactyl untuk sistem tanpa systemd.
-# Jalankan selepas setiap reboot: /usr/local/bin/pterodactyl-services start
+# Jalankan selepas setiap reboot: $runner start
 PANEL_DIR="$PANEL_DIR"
-PHP_V="$PHP_V"
+PHP_FPM_BIN="$(php_fpm_bin)"
 REDIS_PORT="$(cfg REDIS_PORT)"
+WINGS_BIN="$BIN_DIR/wings"
+WINGS_CONF="$WINGS_ETC/config.yml"
+LOG_DIR="$logdir"
+WEB_USER="$WEB_USER"
+DB_SAFE_ARGS="$(db_safe_args)"
+
+mkdir -p "\$LOG_DIR" 2>/dev/null || true
 
 # MESTI prefix arahan, BUKAN fungsi shell. setsid dan nohup ialah binari luar
 # dan tidak dapat memanggil fungsi shell — cubaan itu gagal dengan
 # "nohup: failed to run command 'as_web'" dan queue worker tidak pernah bermula.
-if command -v sudo >/dev/null 2>&1; then
-    RUNAS="sudo -u www-data"
+#
+# Bila kita SUDAH pengguna web (Termux), tiada apa yang perlu diturunkan.
+if [ "\$WEB_USER" = "\$(id -un)" ]; then
+    RUNAS=""
+elif command -v sudo >/dev/null 2>&1; then
+    RUNAS="sudo -u \$WEB_USER"
 elif command -v runuser >/dev/null 2>&1; then
-    RUNAS="runuser -u www-data --"
+    RUNAS="runuser -u \$WEB_USER --"
 else
     RUNAS=""
 fi
 
 start() {
-    mkdir -p /run/mysqld /run/php && chown mysql:mysql /run/mysqld 2>/dev/null || true
+    mkdir -p /run/mysqld /run/php 2>/dev/null && chown mysql:mysql /run/mysqld 2>/dev/null || true
     pgrep -x mariadbd    >/dev/null || pgrep -x mysqld >/dev/null || \\
-        { setsid nohup mariadbd-safe --user=mysql >/var/log/mariadb-boot.log 2>&1 & }
+        { setsid nohup mariadbd-safe \$DB_SAFE_ARGS >"\$LOG_DIR/mariadb-boot.log" 2>&1 & }
     pgrep -x redis-server >/dev/null || \\
-        { setsid nohup redis-server --port "\$REDIS_PORT" >/var/log/redis-boot.log 2>&1 & }
+        { setsid nohup redis-server --port "\$REDIS_PORT" >"\$LOG_DIR/redis-boot.log" 2>&1 & }
     pgrep -f "php-fpm: master" >/dev/null || \\
-        { setsid nohup "php-fpm\$PHP_V" --nodaemonize >/var/log/php-fpm-boot.log 2>&1 & }
+        { setsid nohup "\$PHP_FPM_BIN" --nodaemonize >"\$LOG_DIR/php-fpm-boot.log" 2>&1 & }
     sleep 5
     pgrep -x nginx >/dev/null || nginx 2>/dev/null || true
     pgrep -f 'artisan [q]ueue:work' >/dev/null || \\
         { setsid nohup \$RUNAS php "\$PANEL_DIR/artisan" queue:work \\
-            --queue=high,standard,low --sleep=3 --tries=3 >/var/log/pterodactyl-queue.log 2>&1 & }
+            --queue=high,standard,low --sleep=3 --tries=3 >"\$LOG_DIR/pterodactyl-queue.log" 2>&1 & }
     pgrep -f '[s]chedule:run' >/dev/null || \\
         { setsid nohup bash -c "while true; do \$RUNAS php \$PANEL_DIR/artisan schedule:run >/dev/null 2>&1; sleep 60; done" >/dev/null 2>&1 & }
-    if [ -x /usr/local/bin/wings ]; then
+    if [ -x "\$WINGS_BIN" ]; then
         pgrep -x wings >/dev/null || \\
-            { setsid nohup /usr/local/bin/wings --config /etc/pterodactyl/config.yml >/var/log/wings.log 2>&1 & }
+            { setsid nohup "\$WINGS_BIN" --config "\$WINGS_CONF" >"\$LOG_DIR/wings.log" 2>&1 & }
     fi
     sleep 2
     echo "Service dimulakan."
@@ -763,7 +785,7 @@ case "\${1:-start}" in
     *) echo "Guna: \$0 {start|status}"; exit 1 ;;
 esac
 RUNNER
-    chmod +x /usr/local/bin/pterodactyl-services
+    chmod +x "$runner"
     return 0
 }
 

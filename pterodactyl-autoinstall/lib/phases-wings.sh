@@ -43,8 +43,8 @@ docker_via_official_script() {
 
 STRATEGY_DESC["docker_from_distro"]="pakej docker.io daripada repo distro"
 docker_from_distro() {
-    apt_available docker.io || return 1
-    apt_install docker.io || return 1
+    pkg_available docker.io || return 1
+    pkg_install docker.io || return 1
     docker_start_daemon
 }
 
@@ -57,8 +57,8 @@ docker_via_apt_repo() {
     chmod a+r /etc/apt/keyrings/docker.asc
     printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/%s %s stable\n' \
         "$ARCH_ALT" "$OS_ID" "$OS_CODENAME" >/etc/apt/sources.list.d/docker.list
-    apt_update || return 1
-    apt_install docker-ce docker-ce-cli containerd.io || return 1
+    pkg_update || return 1
+    pkg_install docker-ce docker-ce-cli containerd.io || return 1
     docker_start_daemon
 }
 
@@ -609,7 +609,14 @@ phase_firewall() {
         log_skip "Firewall tidak diminta — tiada perubahan"
         return 0
     fi
-    apt_install ufw fail2ban || { defer_warning "ufw/fail2ban tidak dapat dipasang."; return 0; }
+    # Peraturan firewall ialah tetapan kernel seluruh peranti. Aplikasi Android
+    # tanpa root tidak boleh menyentuhnya, dan tiada ufw dalam repo Termux.
+    if is_termux; then
+        log_skip "Firewall dilangkau — Android tanpa root tidak membenarkan peraturan netfilter"
+        return 0
+    fi
+    pkg_install ufw fail2ban || { defer_warning "ufw/fail2ban tidak dapat dipasang."; return 0; }
+    have ufw || { defer_warning "ufw tiada selepas pemasangan — firewall dilangkau."; return 0; }
 
     # Benarkan SSH DAHULU. Mengaktifkan ufw sebelum ini akan memutuskan
     # sambungan kau sendiri.

@@ -74,7 +74,7 @@ t_scheduler() {
     # dapat SIGPIPE, dan pipefail jadikan hasilnya "gagal" walaupun entri itu
     # memang ADA. Tangkap output dahulu, kemudian padankan.
     local out
-    out="$(crontab -u www-data -l 2>/dev/null || true)
+    out="$(crontab -u "$WEB_USER" -l 2>/dev/null || true)
 $(crontab -l 2>/dev/null || true)"
     [[ "$out" == *"artisan schedule:run"* ]] && return 0
     pgrep -f '[s]chedule:run' >/dev/null 2>&1
@@ -155,7 +155,7 @@ fix_clear_panel_cache() {
 
 STRATEGY_DESC["fix_fix_permissions"]="betulkan pemilikan fail panel"
 fix_fix_permissions() {
-    chown -R www-data:www-data "$PANEL_DIR" 2>/dev/null || true
+    chown_web -R "$PANEL_DIR"
     chmod -R 750 "$PANEL_DIR/storage" "$PANEL_DIR/bootstrap/cache" 2>/dev/null || true
     chmod 600 "$PANEL_DIR/.env" 2>/dev/null || true
     return 0
@@ -236,13 +236,14 @@ run_verification() {
 #---------------------------------------------------------------------------
 install_doctor() {
     local self_dir="$1"
-    cat >/usr/local/bin/pterodactyl-doctor <<DOCTOR
+    mkdir -p "$BIN_DIR" 2>/dev/null || true
+    cat >"$BIN_DIR/pterodactyl-doctor" <<DOCTOR
 #!/usr/bin/env bash
 # Semak pemasangan Pterodactyl dan baiki apa yang boleh dibaiki.
 # Dijana oleh pterodactyl auto-installer.
 exec "$self_dir/install.sh" --doctor "\$@"
 DOCTOR
-    chmod +x /usr/local/bin/pterodactyl-doctor
+    chmod +x "$BIN_DIR/pterodactyl-doctor"
     return 0
 }
 
@@ -280,7 +281,7 @@ LOKASI PENTING
 
 ALAT
   Semak dan baiki : pterodactyl-doctor
-$( [[ "$HAS_SYSTEMD" != "yes" ]] && printf '  Mula service    : /usr/local/bin/pterodactyl-services start\n' )
+$( [[ "$HAS_SYSTEMD" != "yes" ]] && printf '  Mula service    : %s/pterodactyl-services start\n' "$BIN_DIR" )
 CREDS
     ) 2>/dev/null || { log_warn "Tidak dapat menulis fail kredential"; return 0; }
     chmod 600 "$f" 2>/dev/null || true
@@ -338,7 +339,7 @@ print_summary() {
     fi
     if [[ "$HAS_SYSTEMD" != "yes" ]]; then
         printf '\n  %sSistem ini tiada systemd%s — selepas setiap reboot jalankan:\n' "$C_YEL" "$C_OFF"
-        printf '      /usr/local/bin/pterodactyl-services start\n'
+        printf '      %s/pterodactyl-services start\n' "$BIN_DIR"
     fi
     printf '\n  Log penuh: %s\n\n' "$LOG_FILE"
     return 0

@@ -141,7 +141,7 @@ do_restore() {
 
     if [[ -f "$src/panel.env" ]]; then
         cp -p "$src/panel.env" "$PANEL_DIR/.env"
-        chown www-data:www-data "$PANEL_DIR/.env" 2>/dev/null || true
+        chown_web "$PANEL_DIR/.env"
         chmod 600 "$PANEL_DIR/.env"
         log_ok ".env dipulihkan"
     fi
@@ -215,7 +215,7 @@ do_upgrade() {
         art migrate --seed --force || ok=1
     fi
 
-    chown -R www-data:www-data "$PANEL_DIR" 2>/dev/null || true
+    chown_web -R "$PANEL_DIR"
     chmod 600 "$PANEL_DIR/.env" 2>/dev/null || true
     art view:clear || true
     art config:clear || true
@@ -306,7 +306,7 @@ wings_configure_cmd() {
     # Panel yang menggunakan sijil yang tidak dipercayai (self-signed, atau rantai
     # yang tidak lengkap) akan menolak handshake tanpa bendera ini.
     [[ "$(cfg WINGS_ALLOW_INSECURE)" == "yes" ]] && extra+=(--allow-insecure)
-    ( cd "$WINGS_ETC" && /usr/local/bin/wings configure \
+    ( cd "$WINGS_ETC" && "$BIN_DIR/wings" configure \
         --panel-url "$(cfg PANEL_URL)" \
         --token "$(cfg NODE_TOKEN)" \
         --node "$(cfg NODE_ID)" \

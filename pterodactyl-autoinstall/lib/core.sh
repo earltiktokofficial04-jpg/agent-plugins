@@ -187,6 +187,12 @@ TEMP_SWAP_FILE="/var/pterodactyl-install.swap"
 
 ensure_temp_swap() {
     local want_mb="${1:-2048}" ram swap total
+    # Android tidak membenarkan swapon kepada aplikasi. Menulis fail 2GB ke
+    # storan telefon hanya untuk gagal pada baris seterusnya bukan perdagangan
+    # yang berbaloi.
+    if type is_termux >/dev/null 2>&1 && is_termux; then
+        return 1
+    fi
     ram="$(ram_mb)"
     swap="$(awk '/SwapTotal/ { printf "%d", $2 / 1024 }' /proc/meminfo 2>/dev/null || printf 0)"
     total=$(( ram + swap ))
@@ -345,7 +351,11 @@ detect_system() {
 }
 
 ram_mb()  { awk '/MemTotal/ { printf "%d", $2 / 1024 }' /proc/meminfo; }
-disk_mb() { df -Pm / | awk 'NR == 2 { print $4 }'; }
+
+# Ruang kosong pada partition yang benar-benar akan ditulis. Pada Termux itu
+# bukan "/" — root di Android ialah ramdisk kecil yang baca-sahaja, dan
+# memeriksanya akan melaporkan 0MB lalu membatalkan pemasangan yang sihat.
+disk_mb() { df -Pm "${DISK_CHECK_PATH:-/}" | awk 'NR == 2 { print $4 }'; }
 
 #---------------------------------------------------------------------------
 # apt
@@ -384,24 +394,10 @@ apt_q() {
         "$@"
 }
 
-apt_update() { retry apt_q update -qq; }
-
-apt_install() {
-    apt_q install -y -qq "$@"
-}
-
-# Adakah pakej boleh dipasang daripada sumber yang dikonfigurasi sekarang?
-apt_available() {
-    local out
-    out="$(apt-cache policy "$1" 2>/dev/null || true)"
-    [[ "$out" == *"Candidate: "[0-9]* ]]
-}
-
-apt_installed() {
-    local st
-    st="$(dpkg-query -W -f='${Status}' "$1" 2>/dev/null || true)"
-    [[ "$st" == *"install ok installed"* ]]
-}
+# Pemasangan pakej sebenar melalui pkg_install / pkg_update / pkg_available /
+# pkg_installed dalam env.sh. Fungsi-fungsi itu menterjemah nama pakej mengikut
+# persekitaran (nama Termux berbeza daripada nama Debian) sebelum memanggil
+# apt_q di atas. Jangan panggil apt-get terus dari fasa.
 
 #---------------------------------------------------------------------------
 # Enjin fallback

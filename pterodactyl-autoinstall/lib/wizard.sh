@@ -31,6 +31,11 @@ detect_public_ip() {
 
 detect_timezone() {
     local tz=""
+    # Android menyimpan zon waktu dalam property sistem, bukan dalam /etc.
+    if is_termux; then
+        tz="$( { getprop persist.sys.timezone; } 2>/dev/null | tr -d '[:space:]' || true )"
+        [[ -n "$tz" ]] && { printf '%s' "$tz"; return 0; }
+    fi
     if have timedatectl; then
         tz="$(timedatectl show -p Timezone --value 2>/dev/null || true)"
     fi
@@ -218,10 +223,21 @@ wizard() {
     # 5 — password admin
     ask_password ADMIN_PASSWORD "Password admin?"
 
-    # 6 — wings
-    ask_yesno INSTALL_WINGS \
-        "Pasang Wings juga (daemon yang benar-benar menjalankan game server)?" yes \
-        "Tanpa Wings kau dapat panel sahaja dan tidak boleh cipta game server. Wings perlukan Docker — tidak berfungsi atas VPS OpenVZ/LXC."
+    # 6 — wings. Tidak ditanya bila jawapannya sudah pasti tidak: bertanya
+    # soalan yang hanya ada satu jawapan sah adalah memperbodohkan pengguna.
+    if [[ "$CAN_DOCKER" == "no" ]]; then
+        CFG[INSTALL_WINGS]="no"
+        printf '\n  %s↷ Wings dilangkau: %s.%s\n' "$C_DIM" "$DOCKER_BLOCK_REASON" "$C_OFF"
+        printf '  %s  Panel dipasang seperti biasa. Untuk game server, jalankan Wings%s\n' "$C_DIM" "$C_OFF"
+        printf '  %s  pada mesin KVM/bare metal dan daftarkannya ke panel ini.%s\n' "$C_DIM" "$C_OFF"
+    else
+        local wnote="Tanpa Wings kau dapat panel sahaja dan tidak boleh cipta game server. Wings perlukan Docker — tidak berfungsi atas VPS OpenVZ/LXC."
+        [[ "$CAN_DOCKER" == "maybe" ]] \
+            && wnote="AMARAN: $DOCKER_BLOCK_REASON. Kau boleh cuba, tetapi kalau Docker gagal di sini itu sebabnya."
+        ask_yesno INSTALL_WINGS \
+            "Pasang Wings juga (daemon yang benar-benar menjalankan game server)?" yes \
+            "$wnote"
+    fi
 
     # 7 — runtime tambahan
     ask_yesno INSTALL_NODEJS \
@@ -407,11 +423,11 @@ show_plan() {
     printf '    Node.js + Python    : %s\n' "$(cfg INSTALL_NODEJS)"
 
     printf '\n  %sDikesan automatik%s\n' "$C_BLD" "$C_OFF"
+    env_summary
     printf '    OS                  : %s %s (%s)\n' "$OS_ID" "$OS_VER" "$ARCH"
-    printf '    systemd             : %s\n' "$HAS_SYSTEMD"
-    printf '    Virtualisasi        : %s\n' "$VIRT"
     printf '    Zon waktu           : %s\n' "$(cfg PANEL_TIMEZONE)"
     printf '    RAM / disk          : %s MB / %s MB kosong\n' "$(ram_mb)" "$(disk_mb)"
+    printf '    Direktori panel     : %s\n' "$PANEL_DIR"
     printf '    Port panel          : %s\n' "$(cfg PANEL_HTTP_PORT)"
     if cfg_is INSTALL_WINGS yes; then
         printf '    Node                : %s @ %s\n' "$(cfg NODE_NAME)" "$(cfg WINGS_FQDN)"

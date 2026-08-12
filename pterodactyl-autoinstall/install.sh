@@ -21,6 +21,10 @@ INSTALLER_CMDLINE="$0 $*"
 
 # shellcheck source=lib/core.sh
 . "$SELF_DIR/lib/core.sh"
+# env.sh mesti selepas core.sh (ia menggunakan `have`) dan sebelum semua yang
+# lain, kerana ia yang menentukan laluan dan nama pakej yang mereka gunakan.
+# shellcheck source=lib/env.sh
+. "$SELF_DIR/lib/env.sh"
 # shellcheck source=lib/validate.sh
 . "$SELF_DIR/lib/validate.sh"
 # shellcheck source=lib/wizard.sh
@@ -127,9 +131,9 @@ bootstrap_tools() {
     have ss   || need+=(iproute2)
     (( ${#need[@]} == 0 )) && return 0
     log_info "Memasang alat asas dahulu: ${need[*]}"
-    apt_update || true
-    apt_install "${need[@]}" >>"$LOG_FILE" 2>&1 \
-        || die "Tidak dapat memasang ${need[*]}. Semak sumber apt: apt-get update"
+    pkg_update || true
+    pkg_install "${need[@]}" >>"$LOG_FILE" 2>&1 \
+        || die "Tidak dapat memasang ${need[*]}. Semak sumber pakej anda ($PKG_MGR update)."
     return 0
 }
 
@@ -139,24 +143,44 @@ preflight() {
 
     bootstrap_tools
 
-    case "$OS_ID:$OS_VER" in
-        ubuntu:20.04|ubuntu:22.04|ubuntu:24.04|debian:11|debian:12)
-            log_ok "OS disokong: $OS_ID $OS_VER" ;;
-        ubuntu:*|debian:*)
-            defer_warning "OS $OS_ID $OS_VER belum diuji dengan script ini — ia mungkin berjaya, tetapi kau memandu tanpa jaring." ;;
-        *)
-            fatal+=("OS '$OS_ID $OS_VER' tidak disokong. Perlu Ubuntu 20.04/22.04/24.04 atau Debian 11/12.") ;;
-    esac
+    log_ok "Persekitaran: $ENV_LABEL"
+
+    if is_termux; then
+        # Termux bukan Debian dan tidak pernah akan jadi Debian. Menolaknya
+        # kerana /etc/os-release tiada bermakna menolak satu-satunya cara
+        # pemasangan ini boleh berjalan pada telefon.
+        log_warn "Termux dikesan — laluan ini EKSPERIMEN dan panel sahaja."
+        log_warn "Wings tidak dipasang: $DOCKER_BLOCK_REASON"
+    else
+        case "$OS_ID:$OS_VER" in
+            ubuntu:20.04|ubuntu:22.04|ubuntu:24.04|debian:11|debian:12)
+                log_ok "OS disokong: $OS_ID $OS_VER" ;;
+            ubuntu:*|debian:*)
+                defer_warning "OS $OS_ID $OS_VER belum diuji dengan script ini — ia mungkin berjaya, tetapi kau memandu tanpa jaring." ;;
+            *)
+                fatal+=("OS '$OS_ID $OS_VER' tidak disokong. Perlu Ubuntu 20.04/22.04/24.04 atau Debian 11/12.") ;;
+        esac
+    fi
 
     if [[ -n "$ARCH_ALT" ]]; then
         log_ok "Seni bina: $ARCH"
+    elif is_termux; then
+        # Panel ialah PHP — ia tidak peduli tentang seni bina. Hanya binari
+        # Wings yang dimuat turun per-arch, dan Wings tidak dipasang di sini.
+        defer_warning "Seni bina '$ARCH' tiada binari Wings rasmi, tetapi panel tidak memerlukannya."
     else
         fatal+=("Seni bina '$ARCH' tidak disokong. Perlu x86_64 atau aarch64.")
     fi
 
+    # Panel sahaja memerlukan jauh lebih sedikit daripada panel + Wings + game
+    # server, jadi ambang yang sama untuk kedua-duanya akan menolak telefon dan
+    # VPS kecil yang sebenarnya mencukupi.
+    local ram_min=1024 disk_min=5120
+    if ! cfg_is INSTALL_WINGS yes; then ram_min=768; disk_min=2560; fi
+
     local ram; ram="$(ram_mb)"
-    if (( ram < 1024 )); then
-        fatal+=("RAM hanya ${ram}MB. Minimum 1GB untuk panel.")
+    if (( ram < ram_min )); then
+        fatal+=("RAM hanya ${ram}MB. Minimum ${ram_min}MB.")
     elif (( ram < 2048 )); then
         defer_warning "RAM ${ram}MB agak rendah — panel akan jalan tetapi tidak banyak ruang untuk game server."
     else
@@ -164,14 +188,17 @@ preflight() {
     fi
 
     local disk; disk="$(disk_mb)"
-    if (( disk < 5120 )); then
-        fatal+=("Ruang kosong pada / hanya ${disk}MB. Minimum 5GB.")
+    if (( disk < disk_min )); then
+        fatal+=("Ruang kosong pada ${DISK_CHECK_PATH} hanya ${disk}MB. Minimum $(( disk_min / 1024 ))GB.")
     else
-        log_ok "Disk kosong: $(( disk / 1024 ))GB"
+        log_ok "Disk kosong: $(( disk / 1024 ))GB pada $DISK_CHECK_PATH"
     fi
 
-    [[ "$HAS_SYSTEMD" == "yes" ]] && log_ok "systemd aktif" \
-        || defer_warning "systemd tiada (biasanya container LXC/Docker). Service akan dipasang sebagai /usr/local/bin/pterodactyl-services dan perlu dijalankan selepas setiap reboot."
+    if [[ "$HAS_SYSTEMD" == "yes" ]]; then
+        log_ok "systemd aktif"
+    else
+        defer_warning "systemd tiada ($ENV_LABEL). Service akan dipasang sebagai $BIN_DIR/pterodactyl-services dan perlu dijalankan selepas setiap reboot."
+    fi
 
     # Rangkaian: uji fail yang benar-benar akan dimuat turun. Range 0-0 supaya
     # tiada muat turun penuh. Laman utama hos bukan ujian yang berguna — ada
@@ -233,9 +260,9 @@ do_uninstall() {
     done
 
     rm -rf "$PANEL_DIR" "$WINGS_ETC" "$STATE_DIR"
-    rm -f /etc/nginx/sites-enabled/pterodactyl.conf /etc/nginx/sites-available/pterodactyl.conf
+    rm -f "$(nginx_site_path)" /etc/nginx/sites-enabled/pterodactyl.conf
     rm -f /etc/apache2/sites-enabled/pterodactyl.conf /etc/apache2/sites-available/pterodactyl.conf
-    rm -f /usr/local/bin/wings /usr/bin/wings /usr/local/bin/pterodactyl-services /usr/local/bin/pterodactyl-doctor
+    rm -f "$BIN_DIR/wings" /usr/bin/wings "$BIN_DIR/pterodactyl-services" "$BIN_DIR/pterodactyl-doctor"
     docker network rm pterodactyl_nw 2>/dev/null || true
     if have nginx && nginx -t >/dev/null 2>&1; then
         [[ "$HAS_SYSTEMD" == "yes" ]] && systemctl reload nginx 2>/dev/null || nginx -s reload 2>/dev/null || true
@@ -297,13 +324,27 @@ do_doctor() {
 #---------------------------------------------------------------------------
 main() {
     parse_args "$@"
+
+    # Kenal pasti persekitaran SEBELUM apa-apa lagi: ia yang menentukan di mana
+    # log, state dan panel akan berada. Menulis satu baris log dahulu bermakna
+    # log itu dicipta di tempat yang salah.
+    detect_environment
+    env_apply_paths
+
     state_init
     mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
     _raw ""
     _raw "===== run bermula $(_ts) : $INSTALLER_CMDLINE ====="
+    _raw "persekitaran: $ENV_KIND ($ENV_LABEL) pkg=$PKG_MGR root=$IS_ROOT service=$SERVICE_MODE docker=$CAN_DOCKER"
 
-    [[ "$(id -u)" -eq 0 ]] || die "Script mesti dijalankan sebagai root. Guna: sudo $0"
+    # Termux berjalan sebagai pengguna aplikasi biasa dan tidak PERNAH mempunyai
+    # root — memintanya di sana bermakna menolak setiap pemasangan Termux.
+    # Di tempat lain, tanpa root langkah pertama pun gagal.
+    if ! is_termux && [[ "$(id -u)" -ne 0 ]]; then
+        die "Script mesti dijalankan sebagai root. Guna: sudo $0"
+    fi
     detect_system
+    env_adjust_after_detect
     PHP_V="$(state_get php-version)"
 
     # Mod yang beroperasi ke atas pemasangan sedia ada berkongsi persediaan yang
@@ -329,6 +370,10 @@ main() {
             # autofill mesti dijalankan: tanpanya WINGS_DATA_DIR, WINGS_PORT dan
             # rakan-rakannya kosong, dan fasa Wings gagal pada mkdir kosong.
             autofill
+            # Di sini kita tidak boleh matikan Wings dan teruskan — Wings ialah
+            # keseluruhan tujuan mod ini.
+            [[ "$CAN_DOCKER" == "no" ]] && die "Wings tidak boleh dipasang pada $ENV_LABEL: $DOCKER_BLOCK_REASON"
+            [[ "$CAN_DOCKER" == "maybe" ]] && log_warn "$DOCKER_BLOCK_REASON — diteruskan, tetapi fasa Docker mungkin gagal"
             do_wings_only
             ;;
     esac
@@ -338,6 +383,7 @@ main() {
 
     gather_answers
     autofill
+    env_enforce_capabilities
 
     validate_config || {
         printf '  Betulkan nilai di atas'

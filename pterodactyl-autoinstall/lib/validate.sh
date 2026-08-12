@@ -297,7 +297,9 @@ validate_config() {
 recheck_timezone() {
     local tz; tz="$(cfg PANEL_TIMEZONE)"
     [[ -z "$tz" ]] && return 0
-    [[ -f "/usr/share/zoneinfo/$tz" ]] && return 0
+    local zi="/usr/share/zoneinfo"
+    is_termux && zi="$TERMUX_PREFIX/share/zoneinfo"
+    [[ -f "$zi/$tz" ]] && return 0
     log_warn "Zon waktu \"$tz\" tidak wujud dalam pangkalan data — guna UTC"
     CFG[PANEL_TIMEZONE]="UTC"
     return 0
