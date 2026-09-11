@@ -1,0 +1,14 @@
+name: osint_core
+description: Passive OSINT engine — DNS, certificate transparency, RDAP registration, IOC enrichment and typosquat discovery. Pure Dart, no Flutter dependency.
+version: 0.1.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.10.8
+
+dependencies:
+  http: ^1.2.0
+
+dev_dependencies:
+  test: ^1.25.0
+  lints: ^5.0.0

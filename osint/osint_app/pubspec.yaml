@@ -1,0 +1,24 @@
+name: osint_app
+description: Passive OSINT field tool for Android — infrastructure recon, threat-intel enrichment, brand protection and corporate due diligence.
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.10.8
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_secure_storage: ^9.2.2
+  http: ^1.2.0
+  osint_core:
+    path: ../osint_core
+  provider: ^6.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
