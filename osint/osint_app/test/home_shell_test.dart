@@ -72,7 +72,13 @@ Widget _harness() {
         ),
       ),
       ChangeNotifierProvider(
-        create: (_) => BrandViewModel(repository: BrandRepository(dns: dns)),
+        create: (_) => BrandViewModel(
+          repository: BrandRepository(dns: dns),
+          namespaceRepository: TldSweepRepository(
+            dns: dns,
+            registry: IanaRegistryService(client: client),
+          ),
+        ),
       ),
       ChangeNotifierProvider(
         create: (_) => DueDiligenceViewModel(
@@ -117,7 +123,7 @@ void main() {
     expect(find.text('93.184.216.34'), findsWidgets);
     expect(find.text('vpn.example.com'), findsOneWidget);
     expect(find.text('DNS records'), findsOneWidget);
-    expect(find.text('Hosts from Certificate Transparency'), findsOneWidget);
+    expect(find.text('Discovered hosts'), findsOneWidget);
   });
 
   testWidgets('an invalid recon target shows guidance, not a crash',

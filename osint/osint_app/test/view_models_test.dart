@@ -16,6 +16,17 @@ http.Client _nxdomain() => MockClient(
           : http.Response(jsonEncode({'Status': 3}), 200),
     );
 
+BrandViewModel _brandViewModel(http.Client client) {
+  final dns = DnsOverHttpsService(client: client);
+  return BrandViewModel(
+    repository: BrandRepository(dns: dns),
+    namespaceRepository: TldSweepRepository(
+      dns: dns,
+      registry: IanaRegistryService(client: client),
+    ),
+  );
+}
+
 ReconRepository _reconRepository(http.Client client) => ReconRepository(
       dns: DnsOverHttpsService(client: client),
       crtSh: CrtShService(client: client),
@@ -119,21 +130,15 @@ void main() {
 
   group('BrandViewModel', () {
     test('previews the candidate count with no network access', () {
-      final viewModel = BrandViewModel(
-        repository: BrandRepository(
-          dns: DnsOverHttpsService(
-            client: MockClient((_) async => throw StateError('no network')),
-          ),
-        ),
+      final viewModel = _brandViewModel(
+        MockClient((_) async => throw StateError('no network')),
       );
       expect(viewModel.previewCount('example.com'), greaterThan(50));
       expect(viewModel.previewCount('not a domain'), 0);
     });
 
     test('reports progress as a fraction while sweeping', () async {
-      final viewModel = BrandViewModel(
-        repository: BrandRepository(dns: DnsOverHttpsService(client: _nxdomain())),
-      );
+      final viewModel = _brandViewModel(_nxdomain());
       expect(viewModel.progress, isNull);
 
       viewModel.setLimit(25);
@@ -145,12 +150,8 @@ void main() {
     });
 
     test('rejects a malformed brand domain', () async {
-      final viewModel = BrandViewModel(
-        repository: BrandRepository(
-          dns: DnsOverHttpsService(
-            client: MockClient((_) async => throw StateError('no network')),
-          ),
-        ),
+      final viewModel = _brandViewModel(
+        MockClient((_) async => throw StateError('no network')),
       );
       await viewModel.sweep('localhost');
       expect(viewModel.status, ScanStatus.rejected);

@@ -10,6 +10,7 @@ import 'ui/features/due_diligence/view_models/due_diligence_view_model.dart';
 import 'ui/features/home/views/home_shell.dart';
 import 'ui/features/recon/view_models/recon_view_model.dart';
 import 'ui/features/settings/view_models/settings_view_model.dart';
+import 'ui/features/sources/view_models/sources_view_model.dart';
 import 'ui/features/threat_intel/view_models/threat_intel_view_model.dart';
 
 void main() {
@@ -35,6 +36,12 @@ class OsintApp extends StatelessWidget {
     final shodan = ShodanHostService(keys: keyStore, client: client);
     final virusTotal = VirusTotalService(keys: keyStore, client: client);
     final abuseIpdb = AbuseIpdbService(keys: keyStore, client: client);
+    final otx = OtxService(client: client);
+    final hackerTarget = HackerTargetService(client: client);
+    final wayback = WaybackService(client: client);
+    final registry = IanaRegistryService(client: client);
+    final feedService = ThreatFeedService(client: client);
+    final blocklists = BlocklistRepository(feedService: feedService);
 
     return MultiProvider(
       providers: [
@@ -44,6 +51,9 @@ class OsintApp extends StatelessWidget {
               dns: dns,
               crtSh: crtSh,
               shodan: shodan,
+              hackerTarget: hackerTarget,
+              otx: otx,
+              wayback: wayback,
             ),
           ),
         ),
@@ -52,12 +62,18 @@ class OsintApp extends StatelessWidget {
             repository: ThreatIntelRepository(
               virusTotal: virusTotal,
               abuseIpdb: abuseIpdb,
+              otx: otx,
+              blocklists: blocklists,
             ),
           ),
         ),
         ChangeNotifierProvider(
           create: (_) => BrandViewModel(
             repository: BrandRepository(dns: dns),
+            namespaceRepository: TldSweepRepository(
+              dns: dns,
+              registry: registry,
+            ),
           ),
         ),
         ChangeNotifierProvider(
@@ -71,6 +87,11 @@ class OsintApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => SettingsViewModel(keyStore: keyStore),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => SourcesViewModel(
+            repository: CatalogRepository(registry: registry),
+          ),
         ),
       ],
       child: MaterialApp(

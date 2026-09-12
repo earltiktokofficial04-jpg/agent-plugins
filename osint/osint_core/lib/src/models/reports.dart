@@ -4,7 +4,9 @@ import 'registration.dart';
 import 'source_result.dart';
 import 'target.dart';
 import 'typosquat.dart';
+import '../services/otx_service.dart';
 import '../services/shodan_service.dart';
+import '../services/wayback_service.dart';
 
 /// A note about how one source behaved during a scan.
 ///
@@ -46,6 +48,8 @@ class ReconReport {
     this.subdomains = const [],
     this.certificates = const [],
     this.hosts = const {},
+    this.passiveDns = const [],
+    this.archivedUrls = const [],
     this.notes = const [],
   });
 
@@ -59,6 +63,14 @@ class ReconReport {
 
   /// Shodan's view of each resolved IP, when a Shodan key is configured.
   final Map<String, ShodanHost> hosts;
+
+  /// Historical hostname-to-address observations, which reveal where a domain
+  /// pointed before today.
+  final List<PassiveDnsRecord> passiveDns;
+
+  /// URLs the Internet Archive has captured under this domain, which surface
+  /// paths that are no longer linked or served.
+  final List<ArchivedUrl> archivedUrls;
 
   final List<SourceNote> notes;
 

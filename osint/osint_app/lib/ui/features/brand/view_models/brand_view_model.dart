@@ -3,16 +3,49 @@ import 'package:osint_core/osint_core.dart';
 
 import '../../../core/scan_status.dart';
 
+/// Which family of look-alikes to sweep for.
+enum SweepMode {
+  /// Mutate the label, hold the suffix fixed: exarnple.com.
+  typosquat,
+
+  /// Hold the label, vary the suffix: example.tk, example.com.my.
+  namespace,
+}
+
 /// Drives the brand-protection sweep screen.
 ///
 /// The sweep is the only feature that makes hundreds of requests, so this
 /// view model exposes both a candidate preview (free, local) and live progress
 /// during the checked phase.
 class BrandViewModel extends ChangeNotifier {
-  BrandViewModel({required BrandRepository repository})
-      : _repository = repository;
+  BrandViewModel({
+    required BrandRepository repository,
+    required TldSweepRepository namespaceRepository,
+  })  : _repository = repository,
+        _namespaceRepository = namespaceRepository;
 
   final BrandRepository _repository;
+  final TldSweepRepository _namespaceRepository;
+
+  SweepMode _mode = SweepMode.typosquat;
+  SweepMode get mode => _mode;
+
+  SweepBreadth _breadth = SweepBreadth.allTlds;
+  SweepBreadth get breadth => _breadth;
+
+  /// Switches between mutating the label and varying the suffix.
+  void setMode(SweepMode value) {
+    if (_mode == value) return;
+    _mode = value;
+    notifyListeners();
+  }
+
+  /// How far a namespace sweep should reach.
+  void setBreadth(SweepBreadth value) {
+    if (_breadth == value) return;
+    _breadth = value;
+    notifyListeners();
+  }
 
   ScanStatus _status = ScanStatus.idle;
   ScanStatus get status => _status;
@@ -34,6 +67,7 @@ class BrandViewModel extends ChangeNotifier {
   int get total => _total;
 
   int _limit = 150;
+
 
   /// How many candidates a sweep is allowed to check.
   int get limit => _limit;
@@ -62,7 +96,7 @@ class BrandViewModel extends ChangeNotifier {
     return _repository.candidatesFor(target.value).length;
   }
 
-  /// Sweeps look-alikes of [input].
+  /// Sweeps look-alikes of [input] using the selected mode.
   Future<void> sweep(String input) async {
     final target = Target.parse(input);
     if (target.kind != TargetKind.domain && target.kind != TargetKind.url) {
@@ -79,18 +113,33 @@ class BrandViewModel extends ChangeNotifier {
     _total = 0;
     notifyListeners();
 
-    final report = await _repository.sweep(
-      target.value,
-      limit: _limit,
-      onProgress: (checked, total) {
-        _checked = checked;
-        _total = total;
-        notifyListeners();
-      },
-    );
+    void progress(int checked, int total) {
+      _checked = checked;
+      _total = total;
+      notifyListeners();
+    }
+
+    final report = switch (_mode) {
+      SweepMode.typosquat => await _repository.sweep(
+          target.value,
+          limit: _limit,
+          onProgress: progress,
+        ),
+      SweepMode.namespace => await _namespaceRepository.sweep(
+          target.value,
+          breadth: _breadth,
+          limit: _limit,
+          onProgress: progress,
+        ),
+    };
 
     _report = report;
     _status = ScanStatus.done;
     notifyListeners();
   }
+
+  /// How many namespaces the selected breadth covers, for the UI to show
+  /// before any request is made.
+  Future<int> namespaceCount() async =>
+      (await _namespaceRepository.namespacesFor(_breadth)).length;
 }

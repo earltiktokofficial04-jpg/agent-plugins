@@ -85,7 +85,7 @@ class _ReconScreenState extends State<ReconScreen> {
                   : report.addresses.join(', '),
             ),
             KeyValueRow(
-              label: 'CT hosts',
+              label: 'Hosts found',
               value: '${report.subdomains.length}',
             ),
             KeyValueRow(
@@ -109,12 +109,68 @@ class _ReconScreenState extends State<ReconScreen> {
         ),
       if (report.subdomains.isNotEmpty)
         SectionCard(
-          title: 'Hosts from Certificate Transparency',
+          title: 'Discovered hosts',
           trailing: Text('${report.subdomains.length}'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               for (final host in report.subdomains) RecordRow(text: host),
+            ],
+          ),
+        ),
+      if (report.passiveDns.isNotEmpty)
+        SectionCard(
+          title: 'Passive DNS history',
+          trailing: Text('${report.passiveDns.length}'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  'Where these names pointed in the past, which live DNS '
+                  'cannot show.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color:
+                            Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ),
+              for (final record in report.passiveDns.take(40))
+                RecordRow(
+                  leading: record.recordType.isEmpty ? null : record.recordType,
+                  text: '${record.hostname} → ${record.address}'
+                      '${record.lastSeen == null ? '' : '  (last seen '
+                          '${record.lastSeen!.toIso8601String().split('T').first})'}',
+                ),
+            ],
+          ),
+        ),
+      if (report.archivedUrls.isNotEmpty)
+        SectionCard(
+          title: 'Archived URLs',
+          trailing: Text('${report.archivedUrls.length}'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  'Paths the Internet Archive captured. These may no longer '
+                  'be linked or served.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color:
+                            Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ),
+              for (final archived in report.archivedUrls.take(60))
+                RecordRow(
+                  leading: archived.statusCode.isEmpty
+                      ? null
+                      : archived.statusCode,
+                  text: archived.url,
+                ),
             ],
           ),
         ),

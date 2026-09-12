@@ -4,6 +4,7 @@ import '../../brand/views/brand_screen.dart';
 import '../../due_diligence/views/due_diligence_screen.dart';
 import '../../recon/views/recon_screen.dart';
 import '../../settings/views/settings_screen.dart';
+import '../../sources/views/sources_screen.dart';
 import '../../threat_intel/views/threat_intel_screen.dart';
 
 /// The app shell: four feature tabs plus settings.
@@ -30,12 +31,23 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  void _openSources() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const SourcesScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(_titles[_index]),
         actions: [
+          IconButton(
+            tooltip: 'Sources',
+            icon: const Icon(Icons.inventory_2_outlined),
+            onPressed: _openSources,
+          ),
           IconButton(
             tooltip: 'API keys',
             icon: const Icon(Icons.key_outlined),
@@ -128,6 +140,11 @@ class _ScopeDialog extends StatelessWidget {
               'Aimed at infrastructure and organisations — your own estate, '
               'assets you are authorised to assess, brand impersonation, and '
               'counterparty checks.',
+            ),
+            SizedBox(height: 10),
+            Text(
+              'The Sources screen lists every registry and feed consulted, '
+              'with each count traced to the body that publishes the list.',
             ),
           ],
         ),

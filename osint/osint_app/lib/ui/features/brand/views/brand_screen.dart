@@ -37,6 +37,67 @@ class _BrandScreenState extends State<BrandScreen> {
           label: 'Brand domain',
           onSubmit: () => viewModel.sweep(_controller.text),
         ),
+        const SizedBox(height: 14),
+        SegmentedButton<SweepMode>(
+          segments: const [
+            ButtonSegment(
+              value: SweepMode.typosquat,
+              label: Text('Typosquat'),
+              icon: Icon(Icons.text_fields, size: 18),
+            ),
+            ButtonSegment(
+              value: SweepMode.namespace,
+              label: Text('Namespace'),
+              icon: Icon(Icons.public, size: 18),
+            ),
+          ],
+          selected: {viewModel.mode},
+          onSelectionChanged: viewModel.isBusy
+              ? null
+              : (selection) => viewModel.setMode(selection.first),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          viewModel.mode == SweepMode.typosquat
+              ? 'Misspells the brand name and keeps the suffix: '
+                  'exarnple.com, exampel.com.'
+              : 'Keeps the brand name and varies the suffix: example.tk, '
+                  'example.com.my. Namespace lists come from IANA and the '
+                  'Public Suffix List.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        if (viewModel.mode == SweepMode.namespace) ...[
+          const SizedBox(height: 12),
+          DropdownButtonFormField<SweepBreadth>(
+            initialValue: viewModel.breadth,
+            decoration: const InputDecoration(
+              labelText: 'Breadth',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: const [
+              DropdownMenuItem(
+                value: SweepBreadth.focused,
+                child: Text('Focused — commonly abused TLDs'),
+              ),
+              DropdownMenuItem(
+                value: SweepBreadth.allTlds,
+                child: Text('All TLDs — every delegated TLD'),
+              ),
+              DropdownMenuItem(
+                value: SweepBreadth.allSuffixes,
+                child: Text('All suffixes — the full Public Suffix List'),
+              ),
+            ],
+            onChanged: viewModel.isBusy
+                ? null
+                : (value) {
+                    if (value != null) viewModel.setBreadth(value);
+                  },
+          ),
+        ],
         const SizedBox(height: 12),
         Text(
           'Candidates to check: ${viewModel.limit}',
@@ -45,8 +106,8 @@ class _BrandScreenState extends State<BrandScreen> {
         Slider(
           value: viewModel.limit.toDouble(),
           min: 25,
-          max: 400,
-          divisions: 15,
+          max: 2000,
+          divisions: 79,
           label: '${viewModel.limit}',
           onChanged: viewModel.isBusy
               ? null

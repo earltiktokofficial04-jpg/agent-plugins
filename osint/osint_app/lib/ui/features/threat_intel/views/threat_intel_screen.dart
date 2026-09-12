@@ -64,6 +64,85 @@ class _ThreatIntelScreenState extends State<ThreatIntelScreen> {
     );
   }
 
+  /// Renders bulk feed membership.
+  ///
+  /// Shows the corpus size actually searched, so a thin check from failed
+  /// downloads is never mistaken for a thorough clean result.
+  Widget _blocklistCard(BuildContext context, BlocklistReport report) {
+    final theme = Theme.of(context);
+
+    return SectionCard(
+      title: 'Public blocklists',
+      trailing: Text(
+        '${report.feedsChecked} feeds',
+        style: theme.textTheme.labelMedium,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          KeyValueRow(
+            label: 'Entries searched',
+            value: '${report.entriesSearched}',
+          ),
+          const SizedBox(height: 4),
+          if (report.hits.isEmpty)
+            Text(
+              report.feedsChecked == 0
+                  ? 'No feed could be loaded — this is not an all-clear.'
+                  : 'Not listed by any feed that loaded.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: report.feedsChecked == 0
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
+            )
+          else
+            for (final hit in report.hits)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            hit.feed.name,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          hit.feed.severity.name,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: hit.feed.severity == FeedSeverity.contextual
+                                ? theme.colorScheme.onSurfaceVariant
+                                : theme.colorScheme.error,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'listed as ${hit.matchedBlock}',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(fontFamily: 'monospace'),
+                    ),
+                    Text(
+                      hit.feed.description,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+
   List<Widget> _results(
     BuildContext context,
     ThreatIntelViewModel viewModel,
@@ -143,6 +222,7 @@ class _ThreatIntelScreenState extends State<ThreatIntelScreen> {
             ],
           ),
         ),
+      if (result.blocklist != null) _blocklistCard(context, result.blocklist!),
       SectionCard(
         title: 'Sources',
         child: SourceNotesList(

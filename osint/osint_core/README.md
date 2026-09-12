@@ -9,11 +9,15 @@ overview, scope and source list.
 ```
 lib/src/
 ├── models/         Target, DnsRecord, CtCertificate, DomainRegistration,
-│                   IocVerdict, typosquat types, reports, SourceResult
+│                   IocVerdict, typosquat types, threat feeds, catalogue,
+│                   reports, SourceResult
 ├── services/       One class per API — DNS-over-HTTPS, crt.sh, RDAP,
-│                   VirusTotal, AbuseIPDB, Shodan
-├── repositories/   Recon, threat intel, brand, due diligence
-└── util/           Typosquat generation, bounded concurrency
+│                   VirusTotal, AbuseIPDB, Shodan, OTX, HackerTarget,
+│                   Wayback, bulk threat feeds, IANA/Mozilla registries
+├── repositories/   Recon, threat intel, brand, namespace sweep, blocklists,
+│                   due diligence, source catalogue
+└── util/           Typosquat generation, CIDR matching, bounded concurrency,
+                    lenient body decoding
 ```
 
 Services take an injected `http.Client`, so every test runs against
@@ -32,6 +36,21 @@ Services never throw for an expected condition. They return one of:
 
 Callers that fan out convert each result into a `SourceNote` and attach the set
 to the report, so the distinction survives all the way to the screen.
+
+## The source catalogue
+
+`CatalogRepository` enumerates what the tool can consult by fetching the lists
+the governing bodies publish — the IANA TLD list and RDAP bootstrap, Mozilla's
+Public Suffix List, and the CT log list. Counts are therefore checkable against
+their source rather than asserted, and they track reality as it changes.
+
+It reports queryable sources and sweep namespaces separately. A public suffix
+is somewhere a domain can exist, not a server that answers questions; adding
+them together would inflate the headline and mislead.
+
+A registry that cannot be fetched yields a zero-count section flagged `stale`
+rather than aborting the load, and the UI marks those rows. A catalogue missing
+one section beats no catalogue, provided the gap is visible.
 
 ## Adding a source
 

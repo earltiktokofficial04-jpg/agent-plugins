@@ -4,7 +4,10 @@ import '../models/reports.dart';
 import '../models/target.dart';
 import '../services/crtsh_service.dart';
 import '../services/dns_over_https_service.dart';
+import '../services/hackertarget_service.dart';
+import '../services/otx_service.dart';
 import '../services/shodan_service.dart';
+import '../services/wayback_service.dart';
 
 /// Builds an attack-surface picture of a domain from passive sources only.
 ///
@@ -18,13 +21,22 @@ class ReconRepository {
     required DnsOverHttpsService dns,
     required CrtShService crtSh,
     ShodanHostService? shodan,
+    HackerTargetService? hackerTarget,
+    OtxService? otx,
+    WaybackService? wayback,
   })  : _dns = dns,
         _crtSh = crtSh,
-        _shodan = shodan;
+        _shodan = shodan,
+        _hackerTarget = hackerTarget,
+        _otx = otx,
+        _wayback = wayback;
 
   final DnsOverHttpsService _dns;
   final CrtShService _crtSh;
   final ShodanHostService? _shodan;
+  final HackerTargetService? _hackerTarget;
+  final OtxService? _otx;
+  final WaybackService? _wayback;
 
   /// Record types worth pulling for an apex domain.
   static const List<DnsRecordType> apexRecordTypes = [
@@ -63,9 +75,15 @@ class ReconRepository {
 
     final notes = <SourceNote>[];
 
-    // DNS and Certificate Transparency are independent, so overlap them.
+    // Every host-discovery source is independent, so they overlap. Each finds
+    // hosts the others miss: Certificate Transparency only knows hosts that
+    // were issued a certificate, HackerTarget only hosts seen in DNS, and
+    // passive DNS only hosts that resolved at some point in the past.
     final dnsFuture = _resolveApex(target.value);
     final certFuture = _crtSh.certificates(target.value);
+    final hostFuture = _hackerTarget?.hostSearch(target.value);
+    final passiveFuture = _otx?.passiveDns(target);
+    final archiveFuture = _wayback?.urlsFor(target.value);
 
     final dnsRecords = await dnsFuture;
     final certResult = await certFuture;
@@ -86,10 +104,45 @@ class ReconRepository {
     }
 
     final certificates = certResult.valueOrNull ?? const <CtCertificate>[];
-    final subdomains =
-        CrtShService.subdomainsFrom(target.value, certificates);
+    final hosts = <String>{
+      ...CrtShService.subdomainsFrom(target.value, certificates),
+    };
 
-    final hosts = <String, ShodanHost>{};
+    final suffix = '.${target.value}';
+    bool belongsToTarget(String host) =>
+        host == target.value || host.endsWith(suffix);
+
+    if (hostFuture != null) {
+      final hostResult = await hostFuture;
+      notes.add(SourceNote.from(hostResult));
+      for (final record in hostResult.valueOrNull ?? const <HostRecord>[]) {
+        if (belongsToTarget(record.hostname)) hosts.add(record.hostname);
+      }
+    }
+
+    final passiveDns = <PassiveDnsRecord>[];
+    if (passiveFuture != null) {
+      final passiveResult = await passiveFuture;
+      notes.add(SourceNote.from(passiveResult));
+      for (final record
+          in passiveResult.valueOrNull ?? const <PassiveDnsRecord>[]) {
+        passiveDns.add(record);
+        if (belongsToTarget(record.hostname)) hosts.add(record.hostname);
+      }
+    }
+
+    final archivedUrls = <ArchivedUrl>[];
+    if (archiveFuture != null) {
+      final archiveResult = await archiveFuture;
+      notes.add(SourceNote.from(archiveResult));
+      archivedUrls.addAll(
+        archiveResult.valueOrNull ?? const <ArchivedUrl>[],
+      );
+    }
+
+    final subdomains = hosts.toList()..sort();
+
+    final shodanHosts = <String, ShodanHost>{};
     final shodan = _shodan;
     if (enrichHosts && shodan != null) {
       final addresses = <String>{
@@ -103,7 +156,7 @@ class ReconRepository {
         final result = await shodan.host(Target.parse(address));
         notes.add(SourceNote.from(result));
         final host = result.valueOrNull;
-        if (host != null) hosts[address] = host;
+        if (host != null) shodanHosts[address] = host;
       }
     }
 
@@ -112,7 +165,9 @@ class ReconRepository {
       dnsRecords: dnsRecords,
       subdomains: subdomains,
       certificates: certificates,
-      hosts: hosts,
+      hosts: shodanHosts,
+      passiveDns: passiveDns,
+      archivedUrls: archivedUrls,
       notes: notes,
     );
   }
