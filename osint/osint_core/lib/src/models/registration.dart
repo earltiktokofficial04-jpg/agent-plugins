@@ -12,6 +12,7 @@ class DomainRegistration {
     this.statuses = const [],
     this.nameservers = const [],
     this.dnssecSigned = false,
+    this.registryServer = '',
   });
 
   final String domain;
@@ -25,6 +26,13 @@ class DomainRegistration {
 
   final List<String> nameservers;
   final bool dnssecSigned;
+
+  /// The RDAP server that answered.
+  ///
+  /// Worth surfacing: an answer from the TLD's own registry is authoritative,
+  /// whereas one relayed by a bootstrap proxy is a copy. In a due-diligence
+  /// context the difference is the provenance of the whole record.
+  final String registryServer;
 
   /// Age of the registration at [now], or null when the date is unknown.
   ///

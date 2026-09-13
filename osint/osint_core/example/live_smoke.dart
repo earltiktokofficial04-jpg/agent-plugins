@@ -20,7 +20,11 @@ Future<void> main(List<String> args) async {
   final client = IOClient(inner);
 
   final dns = DnsOverHttpsService(client: client);
-  final rdap = RdapService(client: client);
+  // Consult the IANA bootstrap so the query goes to the TLD's own registry.
+  final rdap = RdapService(
+    client: client,
+    bootstrapRegistry: IanaRegistryService(client: client),
+  );
   final crtSh = CrtShService(client: client);
 
   stdout.writeln('== DNS ==');
@@ -40,6 +44,7 @@ Future<void> main(List<String> args) async {
   stdout.writeln('== RDAP ==');
   switch (await rdap.domain(domain)) {
     case SourceSuccess(:final value):
+      stdout.writeln('  answered by: ${value.registryServer}');
       stdout.writeln('  registrar:   ${value.registrar}');
       stdout.writeln('  registered:  ${value.registered}');
       stdout.writeln('  expires:     ${value.expires}');

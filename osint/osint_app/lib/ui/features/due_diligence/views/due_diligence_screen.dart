@@ -109,6 +109,11 @@ class _DueDiligenceScreenState extends State<DueDiligenceScreen> {
                       label: 'Status',
                       value: registration.statuses.join(', '),
                     ),
+                  if (registration.registryServer.isNotEmpty)
+                    KeyValueRow(
+                      label: 'Answered by',
+                      value: registration.registryServer,
+                    ),
                   if (viewModel.isRecentlyRegistered)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),

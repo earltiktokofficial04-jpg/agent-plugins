@@ -32,14 +32,14 @@ class OsintApp extends StatelessWidget {
 
     final dns = DnsOverHttpsService(client: client);
     final crtSh = CrtShService(client: client);
-    final rdap = RdapService(client: client);
+    final registry = IanaRegistryService(client: client);
     final shodan = ShodanHostService(keys: keyStore, client: client);
     final virusTotal = VirusTotalService(keys: keyStore, client: client);
     final abuseIpdb = AbuseIpdbService(keys: keyStore, client: client);
+    final rdap = RdapService(client: client, bootstrapRegistry: registry);
     final otx = OtxService(client: client);
     final hackerTarget = HackerTargetService(client: client);
     final wayback = WaybackService(client: client);
-    final registry = IanaRegistryService(client: client);
     final feedService = ThreatFeedService(client: client);
     final blocklists = BlocklistRepository(feedService: feedService);
 
