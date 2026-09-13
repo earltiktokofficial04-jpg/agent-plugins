@@ -1,9 +1,14 @@
 /// Sources that require a caller-supplied credential.
+///
+/// Every entry must have a service that reads it. An entry with no consumer is
+/// worse than a missing feature: the settings screen would ask the user for a
+/// live bearer credential, store it, and report the capability as enabled,
+/// while nothing ever uses it — so they might skip configuring a source that
+/// does work.
 enum ApiKeySource {
   virusTotal('VirusTotal', 'https://www.virustotal.com/gui/my-apikey'),
   abuseIpdb('AbuseIPDB', 'https://www.abuseipdb.com/account/api'),
-  shodan('Shodan', 'https://account.shodan.io'),
-  urlscan('urlscan.io', 'https://urlscan.io/user/profile/');
+  shodan('Shodan', 'https://account.shodan.io');
 
   const ApiKeySource(this.displayName, this.signupUrl);
 

@@ -185,12 +185,36 @@ class _ReconScreenState extends State<ReconScreen> {
                   label: 'Organisation',
                   value: entry.value.organisation,
                 ),
+              if (entry.value.operatingSystem.isNotEmpty)
+                KeyValueRow(
+                  label: 'OS',
+                  value: entry.value.operatingSystem,
+                ),
               KeyValueRow(
                 label: 'Open ports',
                 value: entry.value.ports.isEmpty
                     ? 'none recorded'
                     : entry.value.ports.join(', '),
               ),
+              if (entry.value.lastUpdate != null)
+                KeyValueRow(
+                  label: 'Last scanned',
+                  value: entry.value.lastUpdate!
+                      .toIso8601String()
+                      .split('T')
+                      .first,
+                ),
+              if (entry.value.hostnames.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Reverse hostnames — other names on this address',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                for (final hostname in entry.value.hostnames)
+                  RecordRow(text: hostname),
+              ],
               for (final service in entry.value.services)
                 RecordRow(text: service.label),
               if (entry.value.vulnerabilities.isNotEmpty) ...[

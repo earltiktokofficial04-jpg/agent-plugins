@@ -25,6 +25,24 @@ class ThreatIntelViewModel extends ChangeNotifier {
   String _rejection = '';
   String get rejection => _rejection;
 
+  int _feedsLoaded = 0;
+
+  /// Bulk feeds downloaded so far in the running lookup.
+  int get feedsLoaded => _feedsLoaded;
+
+  int _feedsTotal = 0;
+
+  /// Bulk feeds the running lookup will download.
+  int get feedsTotal => _feedsTotal;
+
+  /// Fraction of the feed download complete, or null when none is running.
+  ///
+  /// An IPv4 lookup pulls several multi-megabyte volunteer-hosted lists, which
+  /// can take minutes on mobile. Without this the user cannot tell a scan
+  /// that is nearly done from one that has wedged, and will kill the app.
+  double? get feedProgress =>
+      _feedsTotal == 0 ? null : (_feedsLoaded / _feedsTotal).clamp(0.0, 1.0);
+
   bool get isBusy => _status == ScanStatus.running;
 
   /// Enriches [input], which may be a domain, IP, URL or file hash.
@@ -42,9 +60,18 @@ class ThreatIntelViewModel extends ChangeNotifier {
     _target = target;
     _status = ScanStatus.running;
     _rejection = '';
+    _feedsLoaded = 0;
+    _feedsTotal = 0;
     notifyListeners();
 
-    final result = await _repository.enrich(target);
+    final result = await _repository.enrich(
+      target,
+      onFeedProgress: (loaded, total) {
+        _feedsLoaded = loaded;
+        _feedsTotal = total;
+        notifyListeners();
+      },
+    );
 
     _result = result;
     _status = ScanStatus.done;

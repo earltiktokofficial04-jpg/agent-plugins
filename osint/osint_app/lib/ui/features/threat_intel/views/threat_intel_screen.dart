@@ -41,6 +41,16 @@ class _ThreatIntelScreenState extends State<ThreatIntelScreen> {
           hint: 'domain, IP, URL or file hash',
           onSubmit: () => viewModel.enrich(_controller.text),
         ),
+        if (viewModel.isBusy && viewModel.feedsTotal > 0) ...[
+          const SizedBox(height: 16),
+          LinearProgressIndicator(value: viewModel.feedProgress),
+          const SizedBox(height: 6),
+          Text(
+            'Downloading blocklists — ${viewModel.feedsLoaded} of '
+            '${viewModel.feedsTotal}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
         if (viewModel.status == ScanStatus.rejected)
           Padding(
             padding: const EdgeInsets.only(top: 12),

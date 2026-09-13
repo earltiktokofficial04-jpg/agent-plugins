@@ -34,6 +34,31 @@ void main() {
     ApiKeySource.shodan: 'shodan-key',
   });
 
+  group('ApiKeySource', () {
+    test('every key source has a service that reads it', () {
+      // A key source with no consumer asks the user for a live credential,
+      // stores it, and reports the capability as enabled while nothing uses
+      // it. urlscan was exactly that until it was removed.
+      const consumed = {
+        ApiKeySource.virusTotal,
+        ApiKeySource.abuseIpdb,
+        ApiKeySource.shodan,
+      };
+      expect(
+        ApiKeySource.values.toSet(),
+        consumed,
+        reason: 'add the service that reads it, or drop the enum entry',
+      );
+    });
+
+    test('each source names where to get a key', () {
+      for (final source in ApiKeySource.values) {
+        expect(source.displayName, isNotEmpty);
+        expect(source.signupUrl, startsWith('https://'));
+      }
+    });
+  });
+
   group('VirusTotalService', () {
     test('flags two or more detections as malicious', () async {
       final service = VirusTotalService(
