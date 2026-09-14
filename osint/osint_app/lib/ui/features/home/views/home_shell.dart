@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../brand/views/brand_screen.dart';
 import '../../due_diligence/views/due_diligence_screen.dart';
 import '../../recon/views/recon_screen.dart';
+import '../../image_scan/views/image_scan_screen.dart';
+import '../../recon/view_models/recon_view_model.dart';
 import '../../settings/views/settings_screen.dart';
+import '../../threat_intel/view_models/threat_intel_view_model.dart';
 import '../../sources/views/sources_screen.dart';
 import '../../threat_intel/views/threat_intel_screen.dart';
 
@@ -31,6 +35,29 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  /// Opens the image scanner and routes whatever the user picks from it into
+  /// the module that can answer for it.
+  void _openImageScan() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ImageScanScreen(
+          onTargetChosen: (extracted, action) {
+            final value = extracted.target.value;
+            switch (action) {
+              case ImageScanAction.threatIntel:
+                context.read<ThreatIntelViewModel>().enrich(value);
+                setState(() => _index = 1);
+              case ImageScanAction.recon:
+                context.read<ReconViewModel>().scan(value);
+                setState(() => _index = 0);
+            }
+            Navigator.of(context).pop();
+          },
+        ),
+      ),
+    );
+  }
+
   void _openSources() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const SourcesScreen()),
@@ -43,6 +70,11 @@ class _HomeShellState extends State<HomeShell> {
       appBar: AppBar(
         title: Text(_titles[_index]),
         actions: [
+          IconButton(
+            tooltip: 'Scan from image',
+            icon: const Icon(Icons.qr_code_scanner),
+            onPressed: _openImageScan,
+          ),
           IconButton(
             tooltip: 'Sources',
             icon: const Icon(Icons.inventory_2_outlined),

@@ -19,9 +19,27 @@ class ThreatIntelScreen extends StatefulWidget {
 
 class _ThreatIntelScreenState extends State<ThreatIntelScreen> {
   final _controller = TextEditingController();
+  ThreatIntelViewModel? _observed;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final viewModel = context.read<ThreatIntelViewModel>();
+    if (identical(_observed, viewModel)) return;
+    _observed?.removeListener(_syncInput);
+    _observed = viewModel..addListener(_syncInput);
+  }
+
+  /// Mirrors a target handed over from another screen into the field.
+  void _syncInput() {
+    final input = _observed?.lastInput ?? '';
+    if (input.isEmpty || _controller.text == input) return;
+    _controller.text = input;
+  }
 
   @override
   void dispose() {
+    _observed?.removeListener(_syncInput);
     _controller.dispose();
     super.dispose();
   }

@@ -8,6 +8,7 @@ A passive OSINT tool for Android, covering four jobs:
 | **Threat intel** | Is this indicator known-bad? Reputation across APIs plus membership in bulk public blocklists. | None (VirusTotal/AbuseIPDB optional) |
 | **Brand** | Is anyone impersonating us? Two sweeps: misspellings of the name, and the name across every registrable namespace. | None |
 | **Due diligence** | Who is behind this domain? Registration record, DNS and mail posture, certificate footprint. | None |
+| **Scan from image** | What is in this QR code or screenshot? Reads codes and text on-device, extracts every indicator, hands it to the modules above. | None |
 
 Every module works with no API key. Keys only add VirusTotal, AbuseIPDB and Shodan.
 
@@ -60,6 +61,32 @@ thousands are the registries: every TLD runs its own RDAP server, and every
 public suffix is a real namespace a squatter can register in. Those are
 enumerated here, and used.
 
+## Scanning from an image
+
+Point the camera at a QR code, or pick a screenshot of a phishing email or an
+incident report. Codes and text are read **entirely on the device** — the image
+is never uploaded — and every domain, address and hash found becomes something
+you can look up with one tap.
+
+Two details that make the difference between useful and noise:
+
+**Defanged indicators are refanged.** Threat reports deliberately write
+`hxxps://evil[.]com` and `185.220.101[.]5` so a reader cannot fat-finger a live
+link. A screenshot of such a report is exactly what this feature is pointed at,
+so the text is put back into its real form before matching — and the fact that
+it *was* defanged is surfaced, because it means the source already considers
+the indicator hostile.
+
+**Filenames are not domains.** `report.pdf`, `logo.png` and `backup.zip` all
+satisfy the shape of a hostname, and a screenshot is full of them. Extracted
+domains are checked against the live IANA TLD list — the same one the source
+catalogue enumerates — with a bundled fallback so the feature still works
+offline.
+
+What it will not do: identify a person from a photograph, or find someone's
+social media accounts from their face. This is a tool for infrastructure and
+organisations.
+
 ## Scope: passive only
 
 Every source is read second-hand — public resolvers, Certificate Transparency
@@ -86,8 +113,8 @@ authorised to assess, brand impersonation, and counterparty checks.
 
 ```
 osint/
-├── osint_core/     Pure Dart. Every source, model and repository. 177 tests.
-└── osint_app/      Flutter Android UI. MVVM over osint_core. 35 tests.
+├── osint_core/     Pure Dart. Every source, model and repository. 214 tests.
+└── osint_app/      Flutter Android UI. MVVM over osint_core. 55 tests.
 ```
 
 `osint_core` has no Flutter dependency, so it runs under plain `dart test` and
@@ -111,6 +138,7 @@ models, view models hold UI state as `ChangeNotifier`s, and views only render.
 | HackerTarget | Host discovery, reverse IP |
 | Wayback Machine | Archived URLs and forgotten paths |
 | 9 bulk threat feeds | IPv4 blocklist membership |
+| ML Kit (on-device) | OCR and QR/barcode reading — no image leaves the phone |
 | IANA / Mozilla registries | The namespace and endpoint catalogue |
 
 **Keyed** — VirusTotal (4 lookups/minute free), AbuseIPDB (daily quota), Shodan
@@ -131,7 +159,7 @@ flutter run
 flutter build apk --release
 ```
 
-Tests — 212 in total, none of which touch the network:
+Tests — 269 in total, none of which touch the network:
 
 ```bash
 cd osint/osint_core && dart test

@@ -18,9 +18,27 @@ class ReconScreen extends StatefulWidget {
 
 class _ReconScreenState extends State<ReconScreen> {
   final _controller = TextEditingController();
+  ReconViewModel? _observed;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final viewModel = context.read<ReconViewModel>();
+    if (identical(_observed, viewModel)) return;
+    _observed?.removeListener(_syncInput);
+    _observed = viewModel..addListener(_syncInput);
+  }
+
+  /// Mirrors a target handed over from another screen into the field.
+  void _syncInput() {
+    final input = _observed?.lastInput ?? '';
+    if (input.isEmpty || _controller.text == input) return;
+    _controller.text = input;
+  }
 
   @override
   void dispose() {
+    _observed?.removeListener(_syncInput);
     _controller.dispose();
     super.dispose();
   }

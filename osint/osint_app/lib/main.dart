@@ -3,11 +3,13 @@ import 'package:http/http.dart' as http;
 import 'package:osint_core/osint_core.dart';
 import 'package:provider/provider.dart';
 
+import 'data/services/image_indicator_scanner.dart';
 import 'data/services/secure_key_store.dart';
 import 'ui/core/theme.dart';
 import 'ui/features/brand/view_models/brand_view_model.dart';
 import 'ui/features/due_diligence/view_models/due_diligence_view_model.dart';
 import 'ui/features/home/views/home_shell.dart';
+import 'ui/features/image_scan/view_models/image_scan_view_model.dart';
 import 'ui/features/recon/view_models/recon_view_model.dart';
 import 'ui/features/settings/view_models/settings_view_model.dart';
 import 'ui/features/sources/view_models/sources_view_model.dart';
@@ -87,6 +89,12 @@ class OsintApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => SettingsViewModel(keyStore: keyStore),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ImageScanViewModel(
+            scanner: MlKitImageScanner(),
+            registry: registry,
+          ),
         ),
         ChangeNotifierProvider(
           create: (_) => SourcesViewModel(

@@ -43,10 +43,17 @@ class ThreatIntelViewModel extends ChangeNotifier {
   double? get feedProgress =>
       _feedsTotal == 0 ? null : (_feedsLoaded / _feedsTotal).clamp(0.0, 1.0);
 
+  String _lastInput = '';
+
+  /// What was last submitted, so a screen can show a target handed to it from
+  /// elsewhere — the image scanner, for one — in its input field.
+  String get lastInput => _lastInput;
+
   bool get isBusy => _status == ScanStatus.running;
 
   /// Enriches [input], which may be a domain, IP, URL or file hash.
   Future<void> enrich(String input) async {
+    _lastInput = input.trim();
     final target = Target.parse(input);
     if (target.kind == TargetKind.unknown) {
       _status = ScanStatus.rejected;

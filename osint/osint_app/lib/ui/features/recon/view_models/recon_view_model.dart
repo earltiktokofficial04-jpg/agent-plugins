@@ -25,6 +25,12 @@ class ReconViewModel extends ChangeNotifier {
   bool _enrichHosts = false;
   bool get enrichHosts => _enrichHosts;
 
+  String _lastInput = '';
+
+  /// What was last submitted, so a screen can show a target handed to it from
+  /// elsewhere — the image scanner, for one — in its input field.
+  String get lastInput => _lastInput;
+
   bool get isBusy => _status == ScanStatus.running;
 
   /// Whether to spend Shodan credits enriching resolved addresses.
@@ -36,6 +42,7 @@ class ReconViewModel extends ChangeNotifier {
 
   /// Scans [input], which must parse to a domain.
   Future<void> scan(String input) async {
+    _lastInput = input.trim();
     final target = Target.parse(input);
     if (target.kind != TargetKind.domain && target.kind != TargetKind.url) {
       _status = ScanStatus.rejected;
