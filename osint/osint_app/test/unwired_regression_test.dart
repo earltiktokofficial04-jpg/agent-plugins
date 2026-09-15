@@ -89,6 +89,122 @@ void main() {
     });
   });
 
+  group('keyless host enrichment runs without a Shodan key', () {
+    testWidgets('ASN and InternetDB render with no key configured',
+        (tester) async {
+      // Both are free and keyless, so they must appear on an ordinary scan —
+      // not only for users who have paid for Shodan.
+      final client = MockClient((request) async {
+        final url = request.url.toString();
+        if (url.contains('crt.sh')) return http.Response('[]', 200);
+        if (url.contains('internetdb.shodan.io')) {
+          return http.Response(
+            jsonEncode({
+              'ip': '203.0.113.7',
+              'ports': [22, 443],
+              'cpes': ['cpe:/a:openbsd:openssh:9.6'],
+              'vulns': ['CVE-2024-6387'],
+              'tags': ['cloud'],
+              'hostnames': [],
+            }),
+            200,
+          );
+        }
+        final params = request.url.queryParameters;
+        if (params['type'] == '16' &&
+            (params['name'] ?? '').contains('origin.asn.cymru.com')) {
+          return http.Response(
+            jsonEncode({
+              'Status': 0,
+              'Answer': [
+                {
+                  'name': 'x',
+                  'type': 16,
+                  'TTL': 60,
+                  'data': '"64512 | 203.0.113.0/24 | MY | apnic | 2020-01-01"',
+                },
+              ],
+            }),
+            200,
+          );
+        }
+        if (params['type'] == '16') {
+          return http.Response(
+            jsonEncode({
+              'Status': 0,
+              'Answer': [
+                {
+                  'name': 'x',
+                  'type': 16,
+                  'TTL': 60,
+                  'data': '"64512 | MY | apnic | 2020-01-01 | EXAMPLENET, MY"',
+                },
+              ],
+            }),
+            200,
+          );
+        }
+        if (params['type'] == '1') {
+          return http.Response(
+            jsonEncode({
+              'Status': 0,
+              'Answer': [
+                {
+                  'name': 'example.com',
+                  'type': 1,
+                  'TTL': 60,
+                  'data': '203.0.113.7',
+                },
+              ],
+            }),
+            200,
+          );
+        }
+        return http.Response(jsonEncode({'Status': 0, 'Answer': []}), 200);
+      });
+
+      final dns = DnsOverHttpsService(client: client);
+      final viewModel = ReconViewModel(
+        repository: ReconRepository(
+          dns: dns,
+          crtSh: CrtShService(client: client),
+          asnLookup: AsnLookupService(dns: dns),
+          internetDb: InternetDbService(client: client),
+          // No Shodan service at all: the key path is absent entirely.
+        ),
+      );
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: viewModel,
+          child: MaterialApp(
+            home: Scaffold(body: ReconScreen(onOpenSettings: () {})),
+          ),
+        ),
+      );
+
+      await tester.enterText(find.byType(TextField).first, 'example.com');
+      await tester.tap(find.widgetWithText(FilledButton, 'Scan'));
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('Network — 203.0.113.7'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('AS64512 — EXAMPLENET, MY'), findsOneWidget);
+      expect(find.text('203.0.113.0/24'), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+        find.text('InternetDB — 203.0.113.7'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('22, 443'), findsOneWidget);
+      expect(find.text('CVE-2024-6387'), findsOneWidget);
+    });
+  });
+
   group('Shodan data the user paid a credit for is rendered', () {
     testWidgets('reverse hostnames, OS and scan date all reach the screen',
         (tester) async {

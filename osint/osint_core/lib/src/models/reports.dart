@@ -4,6 +4,8 @@ import 'registration.dart';
 import 'source_result.dart';
 import 'target.dart';
 import 'typosquat.dart';
+import '../services/asn_lookup_service.dart';
+import '../services/internetdb_service.dart';
 import '../services/otx_service.dart';
 import '../services/shodan_service.dart';
 import '../services/wayback_service.dart';
@@ -48,6 +50,8 @@ class ReconReport {
     this.subdomains = const [],
     this.certificates = const [],
     this.hosts = const {},
+    this.asns = const {},
+    this.internetDb = const {},
     this.passiveDns = const [],
     this.archivedUrls = const [],
     this.notes = const [],
@@ -63,6 +67,15 @@ class ReconReport {
 
   /// Shodan's view of each resolved IP, when a Shodan key is configured.
   final Map<String, ShodanHost> hosts;
+
+  /// Which autonomous system announces each resolved address.
+  final Map<String, AsnInfo> asns;
+
+  /// Shodan's free InternetDB view of each resolved address.
+  ///
+  /// Separate from [hosts], which holds the paid Shodan API's richer answer.
+  /// InternetDB costs nothing and needs no key, so it runs for everyone.
+  final Map<String, InternetDbHost> internetDb;
 
   /// Historical hostname-to-address observations, which reveal where a domain
   /// pointed before today.

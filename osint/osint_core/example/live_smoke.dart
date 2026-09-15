@@ -41,6 +41,40 @@ Future<void> main(List<String> args) async {
     stdout.writeln('  $record');
   }
 
+  // The first resolved address, used for the host-level sources below.
+  final address = records
+      .where((record) => record.type == DnsRecordType.a)
+      .map((record) => record.data)
+      .firstOrNull;
+
+  if (address != null) {
+    stdout.writeln('== ASN (Team Cymru over the same DoH transport) ==');
+    switch (await AsnLookupService(dns: dns).lookup(Target.parse(address))) {
+      case SourceSuccess(:final value):
+        stdout.writeln('  ${value.label}');
+        stdout.writeln('  prefix: ${value.prefix}  '
+            'country: ${value.countryCode}  registry: ${value.registry}');
+      case SourceEmpty(:final detail):
+        stdout.writeln('  empty: $detail');
+      case SourceFailure(:final message):
+        stdout.writeln('  FAILED: $message');
+    }
+
+    stdout.writeln('== Shodan InternetDB (keyless) ==');
+    switch (await InternetDbService(client: client)
+        .host(Target.parse(address))) {
+      case SourceSuccess(:final value):
+        stdout.writeln('  ports: ${value.ports}');
+        stdout.writeln('  cpes:  ${value.cpes.take(3).toList()}');
+        stdout.writeln('  vulns: ${value.vulnerabilities.length}');
+        stdout.writeln('  tags:  ${value.tags}');
+      case SourceEmpty(:final detail):
+        stdout.writeln('  empty: $detail');
+      case SourceFailure(:final message):
+        stdout.writeln('  FAILED: $message');
+    }
+  }
+
   stdout.writeln('== RDAP ==');
   switch (await rdap.domain(domain)) {
     case SourceSuccess(:final value):

@@ -40,6 +40,8 @@ class OsintApp extends StatelessWidget {
     final abuseIpdb = AbuseIpdbService(keys: keyStore, client: client);
     final rdap = RdapService(client: client, bootstrapRegistry: registry);
     final otx = OtxService(client: client);
+    final asnLookup = AsnLookupService(dns: dns);
+    final internetDb = InternetDbService(client: client);
     final hackerTarget = HackerTargetService(client: client);
     final wayback = WaybackService(client: client);
     final feedService = ThreatFeedService(client: client);
@@ -53,6 +55,8 @@ class OsintApp extends StatelessWidget {
               dns: dns,
               crtSh: crtSh,
               shodan: shodan,
+              asnLookup: asnLookup,
+              internetDb: internetDb,
               hackerTarget: hackerTarget,
               otx: otx,
               wayback: wayback,

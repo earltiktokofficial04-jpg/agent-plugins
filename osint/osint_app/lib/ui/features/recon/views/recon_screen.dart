@@ -64,8 +64,8 @@ class _ReconScreenState extends State<ReconScreen> {
           onChanged: viewModel.isBusy ? null : viewModel.setEnrichHosts,
           title: const Text('Enrich hosts with Shodan'),
           subtitle: const Text(
-            'Reads Shodan\'s existing scan data. Costs one API credit per '
-            'resolved address.',
+            'The paid Shodan API, one credit per address. The free InternetDB '
+            'view already runs on every scan without a key.',
           ),
         ),
         if (viewModel.status == ScanStatus.rejected)
@@ -189,6 +189,83 @@ class _ReconScreenState extends State<ReconScreen> {
                       : archived.statusCode,
                   text: archived.url,
                 ),
+            ],
+          ),
+        ),
+      for (final entry in report.asns.entries)
+        SectionCard(
+          title: 'Network — ${entry.key}',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              KeyValueRow(label: 'AS', value: entry.value.label),
+              if (entry.value.prefix.isNotEmpty)
+                KeyValueRow(label: 'BGP prefix', value: entry.value.prefix),
+              if (entry.value.countryCode.isNotEmpty)
+                KeyValueRow(label: 'Country', value: entry.value.countryCode),
+              if (entry.value.registry.isNotEmpty)
+                KeyValueRow(
+                  label: 'Registry',
+                  value: entry.value.registry.toUpperCase(),
+                ),
+              if (entry.value.allocated != null)
+                KeyValueRow(
+                  label: 'Allocated',
+                  value: entry.value.allocated!
+                      .toIso8601String()
+                      .split('T')
+                      .first,
+                ),
+            ],
+          ),
+        ),
+      for (final entry in report.internetDb.entries)
+        SectionCard(
+          title: 'InternetDB — ${entry.key}',
+          trailing: Text(
+            'free',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              KeyValueRow(
+                label: 'Open ports',
+                value: entry.value.ports.isEmpty
+                    ? 'none recorded'
+                    : entry.value.ports.join(', '),
+              ),
+              if (entry.value.tags.isNotEmpty)
+                KeyValueRow(label: 'Tags', value: entry.value.tags.join(', ')),
+              if (entry.value.hostnames.isNotEmpty)
+                KeyValueRow(
+                  label: 'Hostnames',
+                  value: entry.value.hostnames.join(', '),
+                ),
+              if (entry.value.cpes.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Software fingerprinted',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                for (final cpe in entry.value.cpes) RecordRow(text: cpe),
+              ],
+              if (entry.value.vulnerabilities.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  '${entry.value.vulnerabilities.length} CVE leads — inferred '
+                  'from version banners, verify before acting',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                ),
+                for (final cve in entry.value.vulnerabilities.take(25))
+                  RecordRow(text: cve),
+              ],
             ],
           ),
         ),

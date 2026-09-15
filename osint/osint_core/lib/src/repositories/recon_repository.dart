@@ -2,9 +2,11 @@ import '../models/certificate.dart';
 import '../models/dns_record.dart';
 import '../models/reports.dart';
 import '../models/target.dart';
+import '../services/asn_lookup_service.dart';
 import '../services/crtsh_service.dart';
 import '../services/dns_over_https_service.dart';
 import '../services/hackertarget_service.dart';
+import '../services/internetdb_service.dart';
 import '../services/otx_service.dart';
 import '../services/shodan_service.dart';
 import '../services/wayback_service.dart';
@@ -21,12 +23,16 @@ class ReconRepository {
     required DnsOverHttpsService dns,
     required CrtShService crtSh,
     ShodanHostService? shodan,
+    AsnLookupService? asnLookup,
+    InternetDbService? internetDb,
     HackerTargetService? hackerTarget,
     OtxService? otx,
     WaybackService? wayback,
   })  : _dns = dns,
         _crtSh = crtSh,
         _shodan = shodan,
+        _asnLookup = asnLookup,
+        _internetDb = internetDb,
         _hackerTarget = hackerTarget,
         _otx = otx,
         _wayback = wayback;
@@ -34,6 +40,8 @@ class ReconRepository {
   final DnsOverHttpsService _dns;
   final CrtShService _crtSh;
   final ShodanHostService? _shodan;
+  final AsnLookupService? _asnLookup;
+  final InternetDbService? _internetDb;
   final HackerTargetService? _hackerTarget;
   final OtxService? _otx;
   final WaybackService? _wayback;
@@ -142,16 +150,40 @@ class ReconRepository {
 
     final subdomains = hosts.toList()..sort();
 
+    final addresses = <String>{
+      for (final record in dnsRecords)
+        if (record.type == DnsRecordType.a || record.type == DnsRecordType.aaaa)
+          record.data,
+    }.take(maxHostsToEnrich).toList();
+
+    // ASN and InternetDB are free and keyless, so they run for every scan
+    // rather than only for users who have configured a Shodan key.
+    final asns = <String, AsnInfo>{};
+    final asnLookup = _asnLookup;
+    if (asnLookup != null) {
+      for (final address in addresses) {
+        final result = await asnLookup.lookup(Target.parse(address));
+        notes.add(SourceNote.from(result));
+        final info = result.valueOrNull;
+        if (info != null) asns[address] = info;
+      }
+    }
+
+    final internetDbHosts = <String, InternetDbHost>{};
+    final internetDb = _internetDb;
+    if (internetDb != null) {
+      for (final address in addresses) {
+        final result = await internetDb.host(Target.parse(address));
+        notes.add(SourceNote.from(result));
+        final host = result.valueOrNull;
+        if (host != null) internetDbHosts[address] = host;
+      }
+    }
+
+    // The paid Shodan API stays opt-in: it costs a credit per address.
     final shodanHosts = <String, ShodanHost>{};
     final shodan = _shodan;
     if (enrichHosts && shodan != null) {
-      final addresses = <String>{
-        for (final record in dnsRecords)
-          if (record.type == DnsRecordType.a ||
-              record.type == DnsRecordType.aaaa)
-            record.data,
-      }.take(maxHostsToEnrich);
-
       for (final address in addresses) {
         final result = await shodan.host(Target.parse(address));
         notes.add(SourceNote.from(result));
@@ -166,6 +198,8 @@ class ReconRepository {
       subdomains: subdomains,
       certificates: certificates,
       hosts: shodanHosts,
+      asns: asns,
+      internetDb: internetDbHosts,
       passiveDns: passiveDns,
       archivedUrls: archivedUrls,
       notes: notes,

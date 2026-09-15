@@ -113,8 +113,8 @@ authorised to assess, brand impersonation, and counterparty checks.
 
 ```
 osint/
-├── osint_core/     Pure Dart. Every source, model and repository. 214 tests.
-└── osint_app/      Flutter Android UI. MVVM over osint_core. 55 tests.
+├── osint_core/     Pure Dart. Every source, model and repository. 228 tests.
+└── osint_app/      Flutter Android UI. MVVM over osint_core. 56 tests.
 ```
 
 `osint_core` has no Flutter dependency, so it runs under plain `dart test` and
@@ -132,6 +132,8 @@ models, view models hold UI state as `ChangeNotifier`s, and views only render.
 | Source | Used for |
 |---|---|
 | DNS-over-HTTPS (Cloudflare) | A/AAAA/NS/MX/TXT/SOA/CAA/CNAME |
+| Team Cymru (over the same DoH) | IP-to-ASN, BGP prefix, allocating registry |
+| Shodan InternetDB | Open ports, software fingerprints and CVE leads — no key, no credit |
 | crt.sh | Certificate history, host discovery |
 | RDAP (rdap.org) | Registration, registrar, dates, DNSSEC |
 | AlienVault OTX | Community threat pulses, passive DNS |
@@ -141,8 +143,13 @@ models, view models hold UI state as `ChangeNotifier`s, and views only render.
 | ML Kit (on-device) | OCR and QR/barcode reading — no image leaves the phone |
 | IANA / Mozilla registries | The namespace and endpoint catalogue |
 
-**Keyed** — VirusTotal (4 lookups/minute free), AbuseIPDB (daily quota), Shodan
-(one credit per address).
+**Keyed** — VirusTotal (4 lookups/minute free), AbuseIPDB (daily quota), Shodan's
+paid host API (one credit per address; the free InternetDB view above already
+runs on every scan without a key).
+
+**Licensing matters here.** Several of these sources restrict their free tier to
+non-commercial use, including ones the tool already queries. Read
+[SOURCES.md](SOURCES.md) before selling or bundling this.
 
 API keys are stored in the Android keystore via `flutter_secure_storage`
 (`EncryptedSharedPreferences`), are never read back into the UI once saved, and
@@ -159,7 +166,7 @@ flutter run
 flutter build apk --release
 ```
 
-Tests — 269 in total, none of which touch the network:
+Tests — 284 in total, none of which touch the network:
 
 ```bash
 cd osint/osint_core && dart test
