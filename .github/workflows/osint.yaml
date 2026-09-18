@@ -138,12 +138,23 @@ jobs:
         run: flutter build apk --release --split-per-abi
 
       - name: Report APK sizes
-        run: ls -lh build/app/outputs/flutter-apk/*.apk
+        run: ls -lh build/app/outputs/apk/release/*.apk
 
+      # Uploaded from Gradle's own output directory rather than Flutter's
+      # flutter-apk/ copy. Flutter copies the artifacts across while dropping
+      # the "-unsigned" suffix, so the copies are named as though they were
+      # signed when they are not — verified: apksigner reports DOES NOT VERIFY
+      # on both. Shipping a file whose name lies about its signing state is
+      # how an unsigned build reaches a device and fails to install.
+      #
+      # No signing key is configured on purpose: nothing secret has to live in
+      # the repository or in Actions, and whoever releases signs the artifact
+      # themselves. See osint/RELEASING.md. Dropping an android/key.properties
+      # in makes this same job emit signed APKs instead.
       - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
           name: osint-app-release-apks
-          path: osint/osint_app/build/app/outputs/flutter-apk/*-release.apk
+          path: osint/osint_app/build/app/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 30

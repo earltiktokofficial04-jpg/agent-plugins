@@ -30,10 +30,21 @@ class _ThreatIntelScreenState extends State<ThreatIntelScreen> {
     _observed = viewModel..addListener(_syncInput);
   }
 
+  /// The value last mirrored in, so an unrelated notification cannot
+  /// overwrite what the user has since typed.
+  String _syncedInput = '';
+
   /// Mirrors a target handed over from another screen into the field.
+  ///
+  /// Reacting to any difference between the field and the view model would
+  /// mean every notification — toggling a switch, a progress tick — reverted
+  /// whatever the user had typed since the last scan. Only an actual change
+  /// of the view model's target counts.
   void _syncInput() {
     final input = _observed?.lastInput ?? '';
-    if (input.isEmpty || _controller.text == input) return;
+    if (input.isEmpty || input == _syncedInput) return;
+    _syncedInput = input;
+    if (_controller.text == input) return;
     _controller.text = input;
   }
 
@@ -86,7 +97,12 @@ class _ThreatIntelScreenState extends State<ThreatIntelScreen> {
                 'Look an indicator up across reputation sources.\n\nNeeds a '
                 'VirusTotal or AbuseIPDB key — both have free tiers.',
           ),
-        if (result != null) ..._results(context, viewModel, result),
+        // As on the recon screen: a verdict for the previous indicator must
+        // not sit under the one now being looked up.
+        if (viewModel.isBusy && viewModel.feedsTotal == 0)
+          const ScanInProgress(message: 'Querying reputation sources…'),
+        if (result != null && !viewModel.isBusy)
+          ..._results(context, viewModel, result),
       ],
     );
   }

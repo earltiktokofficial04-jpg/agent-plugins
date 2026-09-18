@@ -163,6 +163,18 @@ void main() {
       expect(report.candidatesChecked, 3);
     });
 
+    test('a failed NS after an empty A is unknown, not unregistered', () async {
+      final repository = _repository(
+        dns: (name, type) =>
+            type == '2' ? http.Response('rate limited', 429) : _nxdomain,
+      );
+      final report = await repository.sweep(
+        'acme.com',
+        breadth: SweepBreadth.allTlds,
+      );
+      expect(report.findings, isEmpty);
+    });
+
     test('honours the limit and reports both counts', () async {
       final repository = _repository(
         dns: (_, __) => _nxdomain,

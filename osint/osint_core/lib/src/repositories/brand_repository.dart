@@ -131,6 +131,9 @@ class BrandRepository {
         candidate: candidate,
         isRegistered: true,
         addresses: addresses,
+        // Only a definite answer counts as "accepts mail"; a failed lookup
+        // leaves it false but the domain is already an actionable finding on
+        // its addresses alone.
         hasMailExchanger: mx is SourceSuccess<List<DnsRecord>>,
       );
     }
@@ -138,6 +141,13 @@ class BrandRepository {
     // No A record does not mean unregistered: parked and mail-only domains are
     // common in impersonation campaigns, so fall back to delegation and mail.
     final nsResult = await _dns.resolve(candidate.domain, DnsRecordType.ns);
+
+    // A failed NS lookup leaves the question open. Falling through to
+    // "not registered" here would be the false all-clear this sweep exists to
+    // avoid — the A lookup already came back empty, so this is the only
+    // remaining evidence and it never arrived.
+    if (nsResult is SourceFailure<List<DnsRecord>>) return null;
+
     if (nsResult is SourceSuccess<List<DnsRecord>>) {
       final mx = await _dns.resolve(candidate.domain, DnsRecordType.mx);
       return TyposquatFinding(

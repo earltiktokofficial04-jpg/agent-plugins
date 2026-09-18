@@ -84,7 +84,18 @@ class ReconViewModel extends ChangeNotifier {
     _rejection = '';
     _notify();
 
-    final report = await _repository.scan(target, enrichHosts: _enrichHosts);
+    final ReconReport report;
+    try {
+      report = await _repository.scan(target, enrichHosts: _enrichHosts);
+    } catch (error) {
+      // Without this the screen stays busy for ever and the Scan button,
+      // the only way out, is disabled while it is busy.
+      if (!_isCurrent(generation)) return;
+      _status = ScanStatus.rejected;
+      _rejection = 'The scan failed: $error';
+      _notify();
+      return;
+    }
     if (!_isCurrent(generation)) return;
 
     _report = report;

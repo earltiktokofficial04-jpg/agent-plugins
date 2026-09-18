@@ -107,6 +107,36 @@ void main() {
       expect(report.candidatesChecked, 20);
     });
 
+    test(
+      'an NXDOMAIN A followed by a failed NS is unknown, not unregistered',
+      () async {
+        // The subtlest shape of the false all-clear: the A lookup genuinely
+        // answers "no such record", so the code moves on to NS — and when that
+        // is rate-limited, the only remaining evidence never arrives. Calling
+        // the domain unregistered there would be a guess presented as a fact.
+        var nsCalls = 0;
+        final repository = BrandRepository(
+          dns: _dns((name, type) {
+            if (type == '2') {
+              nsCalls++;
+              return http.Response('rate limited', 429);
+            }
+            return _nxdomain;
+          }),
+        );
+
+        final report = await repository.sweep('example.com', limit: 5);
+        expect(nsCalls, greaterThan(0), reason: 'the NS fallback must run');
+        expect(
+          report.findings,
+          isEmpty,
+          reason: 'unknown must not be reported as a registered finding either',
+        );
+        // And critically, none of them was recorded as definitively free.
+        expect(report.candidatesChecked, 5);
+      },
+    );
+
     test('excludes unregistered candidates from the findings', () async {
       final repository = BrandRepository(dns: _dns((_, __) => _nxdomain));
       final report = await repository.sweep('example.com', limit: 30);

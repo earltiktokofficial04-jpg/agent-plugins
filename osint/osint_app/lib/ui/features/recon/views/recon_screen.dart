@@ -29,10 +29,21 @@ class _ReconScreenState extends State<ReconScreen> {
     _observed = viewModel..addListener(_syncInput);
   }
 
+  /// The value last mirrored in, so an unrelated notification cannot
+  /// overwrite what the user has since typed.
+  String _syncedInput = '';
+
   /// Mirrors a target handed over from another screen into the field.
+  ///
+  /// Reacting to any difference between the field and the view model would
+  /// mean every notification — toggling a switch, a progress tick — reverted
+  /// whatever the user had typed since the last scan. Only an actual change
+  /// of the view model's target counts.
   void _syncInput() {
     final input = _observed?.lastInput ?? '';
-    if (input.isEmpty || _controller.text == input) return;
+    if (input.isEmpty || input == _syncedInput) return;
+    _syncedInput = input;
+    if (_controller.text == input) return;
     _controller.text = input;
   }
 
@@ -78,7 +89,11 @@ class _ReconScreenState extends State<ReconScreen> {
                 'and known hosts.\n\nEvery source is passive — nothing is '
                 'sent to the target.',
           ),
-        if (report != null) ..._results(context, report),
+        // The previous target's results must not stay on screen while a new
+        // scan runs: the header says one domain and the rows describe
+        // another, and nothing on screen says which.
+        if (viewModel.isBusy) const ScanInProgress(),
+        if (report != null && !viewModel.isBusy) ..._results(context, report),
       ],
     );
   }
@@ -132,7 +147,11 @@ class _ReconScreenState extends State<ReconScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              for (final host in report.subdomains) RecordRow(text: host),
+              TruncatedList(
+                items: report.subdomains,
+                noun: 'hosts',
+                itemBuilder: (host) => RecordRow(text: host),
+              ),
             ],
           ),
         ),
@@ -181,13 +200,13 @@ class _ReconScreenState extends State<ReconScreen> {
                   ),
                 ),
               ),
-              for (final archived in report.archivedUrls.take(60))
-                RecordRow(
-                  leading: archived.statusCode.isEmpty
-                      ? null
-                      : archived.statusCode,
-                  text: archived.url,
-                ),
+              TruncatedList(
+                items: [
+                  for (final archived in report.archivedUrls) archived.url,
+                ],
+                noun: 'URLs',
+                itemBuilder: (url) => RecordRow(text: url),
+              ),
             ],
           ),
         ),
@@ -262,8 +281,12 @@ class _ReconScreenState extends State<ReconScreen> {
                     color: Theme.of(context).colorScheme.error,
                   ),
                 ),
-                for (final cve in entry.value.vulnerabilities.take(25))
-                  RecordRow(text: cve),
+                TruncatedList(
+                  items: entry.value.vulnerabilities,
+                  limit: 25,
+                  noun: 'CVEs',
+                  itemBuilder: (cve) => RecordRow(text: cve),
+                ),
               ],
             ],
           ),
@@ -303,11 +326,21 @@ class _ReconScreenState extends State<ReconScreen> {
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
-                for (final hostname in entry.value.hostnames)
-                  RecordRow(text: hostname),
+                TruncatedList(
+                  items: entry.value.hostnames,
+                  limit: 25,
+                  noun: 'hostnames',
+                  itemBuilder: (hostname) => RecordRow(text: hostname),
+                ),
               ],
-              for (final service in entry.value.services)
-                RecordRow(text: service.label),
+              TruncatedList(
+                items: [
+                  for (final service in entry.value.services) service.label,
+                ],
+                limit: 30,
+                noun: 'services',
+                itemBuilder: (label) => RecordRow(text: label),
+              ),
               if (entry.value.vulnerabilities.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Text(
@@ -316,8 +349,12 @@ class _ReconScreenState extends State<ReconScreen> {
                     color: Theme.of(context).colorScheme.error,
                   ),
                 ),
-                for (final cve in entry.value.vulnerabilities)
-                  RecordRow(text: cve),
+                TruncatedList(
+                  items: entry.value.vulnerabilities,
+                  limit: 25,
+                  noun: 'CVEs',
+                  itemBuilder: (cve) => RecordRow(text: cve),
+                ),
               ],
             ],
           ),

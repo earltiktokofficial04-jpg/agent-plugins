@@ -78,7 +78,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     controller.dispose();
     if (key == null) return;
-    await viewModel.save(source, key);
+    final saved = await viewModel.save(source, key);
+    if (!saved && mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(viewModel.error)));
+    }
   }
 
   @override
@@ -92,6 +97,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           : ListView(
               padding: const EdgeInsets.all(12),
               children: [
+                if (viewModel.error.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Text(
+                      viewModel.error,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(14),

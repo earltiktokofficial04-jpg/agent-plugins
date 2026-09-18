@@ -20,26 +20,66 @@ class SettingsViewModel extends ChangeNotifier {
   bool _isLoading = true;
   bool get isLoading => _isLoading;
 
+  String _error = '';
+
+  /// What went wrong with the last save, load or clear.
+  ///
+  /// The keystore can fail — corruption, or a failed EncryptedSharedPreferences
+  /// migration — and a write that silently did nothing while the row still
+  /// reads "Not configured" leaves the user with no idea whether the problem
+  /// is their key or their phone.
+  String get error => _error;
+
   /// Reads which sources are configured.
   Future<void> load() async {
     _isLoading = true;
+    _error = '';
     notifyListeners();
-    _configured = await _keyStore.configured();
+    try {
+      _configured = await _keyStore.configured();
+      // The key store degrades rather than throwing, which is right for a
+      // scan but wrong here: this screen is the one place where "the keystore
+      // is broken" and "no key is set" must not look the same.
+      if (_keyStore.lastReadFailed) {
+        _error =
+            'Could not read the keystore, so the states below may be wrong. '
+            'Re-entering a key will still work.';
+      }
+    } catch (failure) {
+      _error = 'Could not read the keystore: $failure';
+    }
+    // Always cleared, or a throw leaves the screen spinning for ever.
     _isLoading = false;
     notifyListeners();
   }
 
   /// Stores [key] for [source], or clears it when [key] is blank.
-  Future<void> save(ApiKeySource source, String key) async {
-    await _keyStore.save(source, key);
+  Future<bool> save(ApiKeySource source, String key) async {
+    _error = '';
+    try {
+      await _keyStore.save(source, key);
+    } catch (failure) {
+      _error = 'Could not save the key: $failure';
+      notifyListeners();
+      return false;
+    }
     _configured = await _keyStore.configured();
     notifyListeners();
+    return true;
   }
 
   /// Removes the stored key for [source].
-  Future<void> clear(ApiKeySource source) async {
-    await _keyStore.clear(source);
+  Future<bool> clear(ApiKeySource source) async {
+    _error = '';
+    try {
+      await _keyStore.clear(source);
+    } catch (failure) {
+      _error = 'Could not remove the key: $failure';
+      notifyListeners();
+      return false;
+    }
     _configured = await _keyStore.configured();
     notifyListeners();
+    return true;
   }
 }

@@ -113,8 +113,8 @@ authorised to assess, brand impersonation, and counterparty checks.
 
 ```
 osint/
-├── osint_core/     Pure Dart. Every source, model and repository. 266 tests.
-└── osint_app/      Flutter Android UI. MVVM over osint_core. 59 tests.
+├── osint_core/     Pure Dart. Every source, model and repository. 268 tests.
+└── osint_app/      Flutter Android UI. MVVM over osint_core. 79 tests.
 ```
 
 `osint_core` has no Flutter dependency, so it runs under plain `dart test` and
@@ -167,7 +167,7 @@ flutter run
 flutter build apk --release
 ```
 
-Tests — 325 in total, none of which touch the network:
+Tests — 347 in total, none of which touch the network:
 
 ```bash
 cd osint/osint_core && dart test
@@ -202,6 +202,11 @@ reflectively.
 
 Per-ABI splitting matters here too: a universal APK carrying the OCR and
 barcode models for every architecture is ~96MB, against 29–41MB per ABI.
+
+The APKs come out **unsigned** — no key lives in this repository or in
+Actions. See [RELEASING.md](RELEASING.md) for signing them, and for the trap
+that Flutter copies the artifacts into `flutter-apk/` while dropping the
+`-unsigned` suffix, so those copies are named as though they were signed.
 
 ## Design notes
 

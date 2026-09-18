@@ -55,7 +55,10 @@ class _DueDiligenceScreenState extends State<DueDiligenceScreen> {
                 'mail, and whether its mail is authenticated.\n\nNo API key '
                 'needed.',
           ),
-        if (report != null) ..._results(context, viewModel, report),
+        if (viewModel.isBusy)
+          const ScanInProgress(message: 'Reading public records…'),
+        if (report != null && !viewModel.isBusy)
+          ..._results(context, viewModel, report),
       ],
     );
   }

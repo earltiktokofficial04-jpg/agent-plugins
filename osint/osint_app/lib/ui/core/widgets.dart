@@ -286,3 +286,88 @@ class TargetField extends StatelessWidget {
     );
   }
 }
+
+/// Renders at most [limit] rows and says plainly when it has left some out.
+///
+/// A recon scan of a large estate returns thousands of hosts from Certificate
+/// Transparency. Building them all into a Column janks the frame and, on a
+/// modest phone, gets the app killed. Capping silently is not acceptable
+/// either: a header reading "1,847" above forty rows tells the analyst the
+/// list is complete when it is not, which is how a missed host becomes a
+/// missed finding.
+class TruncatedList extends StatelessWidget {
+  const TruncatedList({
+    required this.items,
+    required this.itemBuilder,
+    this.limit = 50,
+    this.noun = 'entries',
+    super.key,
+  });
+
+  final List<String> items;
+  final Widget Function(String item) itemBuilder;
+  final int limit;
+
+  /// What the items are, for the truncation line: "… and 1,797 more hosts".
+  final String noun;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final shown = items.length <= limit ? items : items.take(limit).toList();
+    final hidden = items.length - shown.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final item in shown) itemBuilder(item),
+        if (hidden > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              '… and $hidden more $noun not shown',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// The body shown while a scan is running.
+///
+/// Without it the screen is blank for as long as the slowest source takes —
+/// up to a minute on a first run — which reads as a hung app.
+class ScanInProgress extends StatelessWidget {
+  const ScanInProgress({this.message = 'Querying sources…', super.key});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+      child: Column(
+        children: [
+          const SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(strokeWidth: 3),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

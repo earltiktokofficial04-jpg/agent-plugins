@@ -80,7 +80,16 @@ class DueDiligenceViewModel extends ChangeNotifier {
     _rejection = '';
     _notify();
 
-    final report = await _repository.profile(target);
+    final DueDiligenceReport report;
+    try {
+      report = await _repository.profile(target);
+    } catch (error) {
+      if (!_isCurrent(generation)) return;
+      _status = ScanStatus.rejected;
+      _rejection = 'The lookup failed: $error';
+      _notify();
+      return;
+    }
     if (!_isCurrent(generation)) return;
 
     _report = report;

@@ -186,6 +186,13 @@ class TldSweepRepository {
     }
 
     final nsResult = await _dns.resolve(candidate.domain, DnsRecordType.ns);
+
+    // A failed NS lookup leaves the question open. Falling through to
+    // "not registered" here would be the false all-clear this sweep exists to
+    // avoid — the A lookup already came back empty, so this is the only
+    // remaining evidence and it never arrived.
+    if (nsResult is SourceFailure<List<DnsRecord>>) return null;
+
     if (nsResult is SourceSuccess<List<DnsRecord>>) {
       return TyposquatFinding(
         candidate: candidate,
