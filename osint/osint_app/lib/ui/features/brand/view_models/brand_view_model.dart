@@ -21,8 +21,8 @@ class BrandViewModel extends ChangeNotifier {
   BrandViewModel({
     required BrandRepository repository,
     required TldSweepRepository namespaceRepository,
-  })  : _repository = repository,
-        _namespaceRepository = namespaceRepository;
+  }) : _repository = repository,
+       _namespaceRepository = namespaceRepository;
 
   final BrandRepository _repository;
   final TldSweepRepository _namespaceRepository;
@@ -67,7 +67,6 @@ class BrandViewModel extends ChangeNotifier {
   int get total => _total;
 
   int _limit = 150;
-
 
   /// How many candidates a sweep is allowed to check.
   int get limit => _limit;
@@ -121,16 +120,16 @@ class BrandViewModel extends ChangeNotifier {
 
     final report = switch (_mode) {
       SweepMode.typosquat => await _repository.sweep(
-          target.value,
-          limit: _limit,
-          onProgress: progress,
-        ),
+        target.value,
+        limit: _limit,
+        onProgress: progress,
+      ),
       SweepMode.namespace => await _namespaceRepository.sweep(
-          target.value,
-          breadth: _breadth,
-          limit: _limit,
-          onProgress: progress,
-        ),
+        target.value,
+        breadth: _breadth,
+        limit: _limit,
+        onProgress: progress,
+      ),
     };
 
     _report = report;

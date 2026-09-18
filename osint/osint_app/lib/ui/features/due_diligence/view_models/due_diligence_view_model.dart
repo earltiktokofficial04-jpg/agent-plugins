@@ -8,8 +8,8 @@ class DueDiligenceViewModel extends ChangeNotifier {
   DueDiligenceViewModel({
     required DueDiligenceRepository repository,
     DateTime Function() now = DateTime.now,
-  })  : _repository = repository,
-        _now = now;
+  }) : _repository = repository,
+       _now = now;
 
   final DueDiligenceRepository _repository;
 

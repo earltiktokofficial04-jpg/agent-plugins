@@ -73,10 +73,7 @@ class KeyValueRow extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: SelectableText(
-              value,
-              style: theme.textTheme.bodyMedium,
-            ),
+            child: SelectableText(value, style: theme.textTheme.bodyMedium),
           ),
         ],
       ),
@@ -98,9 +95,9 @@ class RecordRow extends StatelessWidget {
       onLongPress: () async {
         await Clipboard.setData(ClipboardData(text: text));
         if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Copied')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Copied')));
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),

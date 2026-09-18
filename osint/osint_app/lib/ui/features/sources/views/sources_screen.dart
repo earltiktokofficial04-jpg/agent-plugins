@@ -37,11 +37,11 @@ class _SourcesScreenState extends State<SourcesScreen> {
   }
 
   static String _kindLabel(CatalogKind kind) => switch (kind) {
-        CatalogKind.queryableEndpoint => 'Queryable servers',
-        CatalogKind.feed => 'Bulk threat feeds',
-        CatalogKind.api => 'API integrations',
-        CatalogKind.namespace => 'Sweep namespaces',
-      };
+    CatalogKind.queryableEndpoint => 'Queryable servers',
+    CatalogKind.feed => 'Bulk threat feeds',
+    CatalogKind.api => 'API integrations',
+    CatalogKind.namespace => 'Sweep namespaces',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +101,11 @@ class _SourcesScreenState extends State<SourcesScreen> {
                   ),
                   KeyValueRow(
                     label: 'Fetched',
-                    value: catalog.fetchedAt.toLocal().toString().split('.').first,
+                    value: catalog.fetchedAt
+                        .toLocal()
+                        .toString()
+                        .split('.')
+                        .first,
                   ),
                   if (catalog.hasStaleSections)
                     Padding(
@@ -109,8 +113,9 @@ class _SourcesScreenState extends State<SourcesScreen> {
                       child: Text(
                         'Some registries could not be reached, so the totals '
                         'below are incomplete. The affected rows are marked.',
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: theme.colorScheme.error),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.error,
+                        ),
                       ),
                     ),
                 ],
@@ -252,10 +257,7 @@ class _SectionRow extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  section.name,
-                  style: theme.textTheme.bodyMedium,
-                ),
+                child: Text(section.name, style: theme.textTheme.bodyMedium),
               ),
               if (section.stale)
                 Icon(

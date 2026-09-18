@@ -8,10 +8,8 @@ import 'package:test/test.dart';
 void main() {
   group('OtxService', () {
     OtxService service(Object body, [int status = 200]) => OtxService(
-          client: MockClient(
-            (_) async => http.Response(jsonEncode(body), status),
-          ),
-        );
+      client: MockClient((_) async => http.Response(jsonEncode(body), status)),
+    );
 
     test('treats many pulses as malicious', () async {
       final result = await service({
@@ -84,7 +82,12 @@ void main() {
       final otx = OtxService(
         client: MockClient((request) async {
           paths.add(request.url.path);
-          return http.Response(jsonEncode({'pulse_info': {'count': 0}}), 200);
+          return http.Response(
+            jsonEncode({
+              'pulse_info': {'count': 0},
+            }),
+            200,
+          );
         }),
       );
 
@@ -98,8 +101,10 @@ void main() {
     });
 
     test('reports an unknown indicator as empty', () async {
-      final result =
-          await service(const {}, 404).lookup(Target.parse('example.com'));
+      final result = await service(
+        const {},
+        404,
+      ).lookup(Target.parse('example.com'));
       expect(result, isA<SourceEmpty<IocVerdict>>());
     });
 
@@ -123,8 +128,9 @@ void main() {
         ),
       );
 
-      final records =
-          (await otx.passiveDns(Target.parse('example.com'))).valueOrNull!;
+      final records = (await otx.passiveDns(
+        Target.parse('example.com'),
+      )).valueOrNull!;
       expect(records, hasLength(1));
       expect(records.single.hostname, 'old.example.com');
       expect(records.single.firstSeen, DateTime.parse('2024-01-01'));
@@ -155,13 +161,15 @@ void main() {
         ),
       );
 
-      final records =
-          (await service.hostSearch('anthropic.com')).valueOrNull!;
+      final records = (await service.hostSearch('anthropic.com')).valueOrNull!;
       expect(records, hasLength(2));
       expect(records.first.hostname, 'a-api.anthropic.com');
       expect(records.first.address, '160.79.104.10');
-      expect(records.last.hostname, 'a-cdn.anthropic.com',
-          reason: 'hostnames are lowercased');
+      expect(
+        records.last.hostname,
+        'a-cdn.anthropic.com',
+        reason: 'hostnames are lowercased',
+      );
     });
 
     test('detects the quota message returned with a 200 status', () async {
@@ -169,7 +177,8 @@ void main() {
       // only the status code would treat the message as data.
       final service = HackerTargetService(
         client: MockClient(
-          (_) async => http.Response('API count exceeded - Increase Quota', 200),
+          (_) async =>
+              http.Response('API count exceeded - Increase Quota', 200),
         ),
       );
       final result = await service.hostSearch('example.com');

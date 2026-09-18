@@ -33,8 +33,8 @@ class TldSweepRepository {
   TldSweepRepository({
     required DnsOverHttpsService dns,
     required IanaRegistryService registry,
-  })  : _dns = dns,
-        _registry = registry;
+  }) : _dns = dns,
+       _registry = registry;
 
   final DnsOverHttpsService _dns;
   final IanaRegistryService _registry;
@@ -126,25 +126,24 @@ class TldSweepRepository {
     final toCheck = candidates.take(limit).toList();
     var checked = 0;
 
-    final findings = await mapWithConcurrency(
-      toCheck,
-      (candidate) async {
-        final finding = await _check(candidate);
-        checked++;
-        onProgress?.call(checked, toCheck.length);
-        return finding;
-      },
-      concurrency: concurrency,
-    );
+    final findings = await mapWithConcurrency(toCheck, (candidate) async {
+      final finding = await _check(candidate);
+      checked++;
+      onProgress?.call(checked, toCheck.length);
+      return finding;
+    }, concurrency: concurrency);
 
-    final registered = findings
-        .where((finding) => finding != null && finding.isRegistered)
-        .cast<TyposquatFinding>()
-        .toList()
-      ..sort((a, b) {
-        if (a.isActionable != b.isActionable) return a.isActionable ? -1 : 1;
-        return a.candidate.domain.compareTo(b.candidate.domain);
-      });
+    final registered =
+        findings
+            .where((finding) => finding != null && finding.isRegistered)
+            .cast<TyposquatFinding>()
+            .toList()
+          ..sort((a, b) {
+            if (a.isActionable != b.isActionable) {
+              return a.isActionable ? -1 : 1;
+            }
+            return a.candidate.domain.compareTo(b.candidate.domain);
+          });
 
     return BrandReport(
       brandDomain: brandDomain,
@@ -155,7 +154,8 @@ class TldSweepRepository {
         SourceNote(
           source: 'Namespace sweep',
           ok: true,
-          message: '${toCheck.length} of ${candidates.length} namespaces '
+          message:
+              '${toCheck.length} of ${candidates.length} namespaces '
               'checked (${breadth.name})',
         ),
       ],

@@ -34,8 +34,10 @@ void main() {
 
   group('generate', () {
     test('never returns the original domain', () {
-      final domains =
-          generator.generate('example.com').map((c) => c.domain).toList();
+      final domains = generator
+          .generate('example.com')
+          .map((c) => c.domain)
+          .toList();
       expect(domains, isNot(contains('example.com')));
     });
 
@@ -95,8 +97,11 @@ void main() {
       final legal = RegExp(r'^[a-z0-9-]+$');
       for (final candidate in generator.generate('example.com')) {
         final label = TyposquatGenerator.splitDomain(candidate.domain).label;
-        expect(legal.hasMatch(label), isTrue,
-            reason: '${candidate.domain} has an illegal label');
+        expect(
+          legal.hasMatch(label),
+          isTrue,
+          reason: '${candidate.domain} has an illegal label',
+        );
       }
     });
 

@@ -49,6 +49,5 @@ class IocReport {
   }
 
   /// True when at least one source returned a usable opinion.
-  bool get hasOpinion =>
-      verdicts.any((v) => v.severity != IocSeverity.unknown);
+  bool get hasOpinion => verdicts.any((v) => v.severity != IocSeverity.unknown);
 }

@@ -4,6 +4,7 @@ import '../models/reports.dart';
 import '../models/target.dart';
 import '../services/crtsh_service.dart';
 import '../services/dns_over_https_service.dart';
+import '../services/mail_security_service.dart';
 import '../services/rdap_service.dart';
 
 /// Assembles the public-record profile of an organisation's domain.
@@ -16,13 +17,16 @@ class DueDiligenceRepository {
     required RdapService rdap,
     required DnsOverHttpsService dns,
     required CrtShService crtSh,
-  })  : _rdap = rdap,
-        _dns = dns,
-        _crtSh = crtSh;
+    MailSecurityService? mailSecurity,
+  }) : _rdap = rdap,
+       _dns = dns,
+       _crtSh = crtSh,
+       _mailSecurity = mailSecurity;
 
   final RdapService _rdap;
   final DnsOverHttpsService _dns;
   final CrtShService _crtSh;
+  final MailSecurityService? _mailSecurity;
 
   /// Record types that carry organisational signal.
   static const List<DnsRecordType> profileRecordTypes = [
@@ -51,10 +55,12 @@ class DueDiligenceRepository {
     final rdapFuture = _rdap.domain(target.value);
     final dnsFuture = _dns.resolveAll(target.value, profileRecordTypes);
     final certFuture = _crtSh.certificates(target.value);
+    final mailFuture = _mailSecurity?.evaluate(target);
 
     final rdapResult = await rdapFuture;
     final dnsRecords = await dnsFuture;
     final certResult = await certFuture;
+    final mailResult = await mailFuture;
 
     final certificates = certResult.valueOrNull ?? const <CtCertificate>[];
 
@@ -63,8 +69,10 @@ class DueDiligenceRepository {
       registration: rdapResult.valueOrNull,
       dnsRecords: dnsRecords,
       certificateIssuers: _issuers(certificates),
-      subdomainCount:
-          CrtShService.subdomainsFrom(target.value, certificates).length,
+      subdomainCount: CrtShService.subdomainsFrom(
+        target.value,
+        certificates,
+      ).length,
       notes: [
         SourceNote.from(rdapResult),
         SourceNote(
@@ -73,6 +81,7 @@ class DueDiligenceRepository {
           message: dnsRecords.isEmpty ? 'No records resolved' : '',
         ),
         SourceNote.from(certResult),
+        if (mailResult != null) SourceNote.from(mailResult),
       ],
     );
   }

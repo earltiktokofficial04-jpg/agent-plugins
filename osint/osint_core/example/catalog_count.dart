@@ -38,16 +38,20 @@ Future<void> main() async {
   final report = await blocklists.check(Target.parse('185.220.101.1'));
 
   stdout.writeln('');
-  stdout.writeln('feeds loaded      : ${report.feedsChecked} of '
-      '${blocklists.feeds.length}');
+  stdout.writeln(
+    'feeds loaded      : ${report.feedsChecked} of '
+    '${blocklists.feeds.length}',
+  );
   stdout.writeln('feed entries      : ${report.entriesSearched}');
   for (final note in report.notes.where((note) => !note.ok)) {
     stdout.writeln('  failed: ${note.source} — ${note.message}');
   }
   stdout.writeln('test IP hits      : ${report.hits.length}');
   for (final hit in report.hits) {
-    stdout.writeln('  ${hit.feed.name} → ${hit.matchedBlock} '
-        '(${hit.feed.severity.name})');
+    stdout.writeln(
+      '  ${hit.feed.name} → ${hit.matchedBlock} '
+      '(${hit.feed.severity.name})',
+    );
   }
 
   client.close();

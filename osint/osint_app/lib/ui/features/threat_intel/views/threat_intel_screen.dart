@@ -74,10 +74,9 @@ class _ThreatIntelScreenState extends State<ThreatIntelScreen> {
             padding: const EdgeInsets.only(top: 12),
             child: Text(
               viewModel.rejection,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: Theme.of(context).colorScheme.error),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+              ),
             ),
           ),
         if (viewModel.status == ScanStatus.idle)
@@ -154,8 +153,9 @@ class _ThreatIntelScreenState extends State<ThreatIntelScreen> {
                     ),
                     Text(
                       'listed as ${hit.matchedBlock}',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(fontFamily: 'monospace'),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontFamily: 'monospace',
+                      ),
                     ),
                     Text(
                       hit.feed.description,
@@ -185,11 +185,11 @@ class _ThreatIntelScreenState extends State<ThreatIntelScreen> {
         title: 'Verdict',
         trailing: Chip(
           label: Text(severityLabel(severity)),
-          backgroundColor:
-              severityColor(severity, theme.colorScheme).withValues(alpha: 0.14),
-          side: BorderSide(
-            color: severityColor(severity, theme.colorScheme),
-          ),
+          backgroundColor: severityColor(
+            severity,
+            theme.colorScheme,
+          ).withValues(alpha: 0.14),
+          side: BorderSide(color: severityColor(severity, theme.colorScheme)),
           labelStyle: theme.textTheme.labelMedium?.copyWith(
             color: severityColor(severity, theme.colorScheme),
             fontWeight: FontWeight.w700,
@@ -209,8 +209,9 @@ class _ThreatIntelScreenState extends State<ThreatIntelScreen> {
                 child: Text(
                   'No source returned an opinion. This is not an all-clear — '
                   'check the source list below.',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.error),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
                 ),
               ),
           ],
@@ -232,19 +233,14 @@ class _ThreatIntelScreenState extends State<ThreatIntelScreen> {
               if (verdict.totalEngines > 0)
                 KeyValueRow(
                   label: 'Detections',
-                  value: '${verdict.detections} of ${verdict.totalEngines} '
+                  value:
+                      '${verdict.detections} of ${verdict.totalEngines} '
                       'engines',
                 )
               else if (verdict.detections > 0)
-                KeyValueRow(
-                  label: 'Reports',
-                  value: '${verdict.detections}',
-                ),
+                KeyValueRow(label: 'Reports', value: '${verdict.detections}'),
               if (verdict.score != null)
-                KeyValueRow(
-                  label: 'Confidence',
-                  value: '${verdict.score}/100',
-                ),
+                KeyValueRow(label: 'Confidence', value: '${verdict.score}/100'),
               for (final entry in verdict.details.entries)
                 KeyValueRow(label: entry.key, value: entry.value),
             ],

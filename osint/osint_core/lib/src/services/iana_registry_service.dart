@@ -30,8 +30,7 @@ class RdapBootstrap {
 
   /// Distinct registry servers, which is the meaningful source count: many
   /// TLDs share one operator's server.
-  int get serverCount =>
-      entries.map((entry) => entry.serverUrl).toSet().length;
+  int get serverCount => entries.map((entry) => entry.serverUrl).toSet().length;
 
   /// TLDs with a published RDAP server.
   int get tldCount => _byTld.length;
@@ -47,7 +46,11 @@ class RdapBootstrap {
 
 /// A Certificate Transparency log.
 class CtLog {
-  const CtLog({required this.url, required this.operator, this.description = ''});
+  const CtLog({
+    required this.url,
+    required this.operator,
+    this.description = '',
+  });
 
   final String url;
   final String operator;
@@ -186,8 +189,7 @@ class IanaRegistryService {
     T Function(String body) parse,
   ) async {
     try {
-      final response =
-          await _client.get(Uri.parse(url)).timeout(timeout);
+      final response = await _client.get(Uri.parse(url)).timeout(timeout);
       if (response.statusCode != 200) {
         return SourceFailure(source, 'HTTP ${response.statusCode}');
       }
@@ -207,8 +209,7 @@ class IanaRegistryService {
     T? Function(Object? decoded) parse,
   ) async {
     try {
-      final response =
-          await _client.get(Uri.parse(url)).timeout(timeout);
+      final response = await _client.get(Uri.parse(url)).timeout(timeout);
       if (response.statusCode != 200) {
         return SourceFailure(source, 'HTTP ${response.statusCode}');
       }

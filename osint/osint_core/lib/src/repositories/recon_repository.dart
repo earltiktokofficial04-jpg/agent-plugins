@@ -28,14 +28,14 @@ class ReconRepository {
     HackerTargetService? hackerTarget,
     OtxService? otx,
     WaybackService? wayback,
-  })  : _dns = dns,
-        _crtSh = crtSh,
-        _shodan = shodan,
-        _asnLookup = asnLookup,
-        _internetDb = internetDb,
-        _hackerTarget = hackerTarget,
-        _otx = otx,
-        _wayback = wayback;
+  }) : _dns = dns,
+       _crtSh = crtSh,
+       _shodan = shodan,
+       _asnLookup = asnLookup,
+       _internetDb = internetDb,
+       _hackerTarget = hackerTarget,
+       _otx = otx,
+       _wayback = wayback;
 
   final DnsOverHttpsService _dns;
   final CrtShService _crtSh;
@@ -143,9 +143,7 @@ class ReconRepository {
     if (archiveFuture != null) {
       final archiveResult = await archiveFuture;
       notes.add(SourceNote.from(archiveResult));
-      archivedUrls.addAll(
-        archiveResult.valueOrNull ?? const <ArchivedUrl>[],
-      );
+      archivedUrls.addAll(archiveResult.valueOrNull ?? const <ArchivedUrl>[]);
     }
 
     final subdomains = hosts.toList()..sort();

@@ -45,13 +45,15 @@ class WaybackService {
     String domain, {
     int limit = 200,
   }) async {
-    final uri = Uri.parse(baseUrl).replace(queryParameters: {
-      'url': '*.$domain/*',
-      'output': 'json',
-      'fl': 'original,timestamp,statuscode,mimetype',
-      'collapse': 'urlkey',
-      'limit': '-$limit',
-    });
+    final uri = Uri.parse(baseUrl).replace(
+      queryParameters: {
+        'url': '*.$domain/*',
+        'output': 'json',
+        'fl': 'original,timestamp,statuscode,mimetype',
+        'collapse': 'urlkey',
+        'limit': '-$limit',
+      },
+    );
 
     try {
       final response = await _client.get(uri).timeout(timeout);
@@ -76,8 +78,7 @@ class WaybackService {
         urls.add(
           ArchivedUrl(
             url: '${row[0]}',
-            timestamp:
-                row.length > 1 ? _parseTimestamp('${row[1]}') : null,
+            timestamp: row.length > 1 ? _parseTimestamp('${row[1]}') : null,
             statusCode: row.length > 2 ? '${row[2]}' : '',
             mimeType: row.length > 3 ? '${row[3]}' : '',
           ),
@@ -96,10 +97,11 @@ class WaybackService {
   /// Parses the CDX `yyyyMMddHHmmss` timestamp format.
   static DateTime? _parseTimestamp(String value) {
     if (value.length < 8) return null;
-    final iso = '${value.substring(0, 4)}-${value.substring(4, 6)}-'
+    final iso =
+        '${value.substring(0, 4)}-${value.substring(4, 6)}-'
         '${value.substring(6, 8)}'
         '${value.length >= 14 ? 'T${value.substring(8, 10)}:'
-            '${value.substring(10, 12)}:${value.substring(12, 14)}Z' : ''}';
+                  '${value.substring(10, 12)}:${value.substring(12, 14)}Z' : ''}';
     return DateTime.tryParse(iso);
   }
 

@@ -40,20 +40,22 @@ void main() {
 
     test('strips the quotes DNS puts around TXT values', () async {
       final service = DnsOverHttpsService(
-        client: MockClient((_) async => http.Response(
-              jsonEncode({
-                'Status': 0,
-                'Answer': [
-                  {
-                    'name': 'example.com',
-                    'type': 16,
-                    'TTL': 60,
-                    'data': '"v=spf1 include:_spf.example.com ~all"',
-                  },
-                ],
-              }),
-              200,
-            )),
+        client: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'Status': 0,
+              'Answer': [
+                {
+                  'name': 'example.com',
+                  'type': 16,
+                  'TTL': 60,
+                  'data': '"v=spf1 include:_spf.example.com ~all"',
+                },
+              ],
+            }),
+            200,
+          ),
+        ),
       );
 
       final result = await service.resolve('example.com', DnsRecordType.txt);
@@ -104,7 +106,10 @@ void main() {
 
     test('reports a thrown transport error as a failure', () async {
       final service = DnsOverHttpsService(
-        client: MockClient((_) async => throw http.ClientException('simulated transport failure')),
+        client: MockClient(
+          (_) async =>
+              throw http.ClientException('simulated transport failure'),
+        ),
       );
 
       final result = await service.resolve('example.com', DnsRecordType.a);
@@ -113,15 +118,17 @@ void main() {
 
     test('skips record types the engine does not model', () async {
       final service = DnsOverHttpsService(
-        client: MockClient((_) async => http.Response(
-              jsonEncode({
-                'Status': 0,
-                'Answer': [
-                  {'name': 'example.com', 'type': 99, 'TTL': 1, 'data': 'x'},
-                ],
-              }),
-              200,
-            )),
+        client: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'Status': 0,
+              'Answer': [
+                {'name': 'example.com', 'type': 99, 'TTL': 1, 'data': 'x'},
+              ],
+            }),
+            200,
+          ),
+        ),
       );
 
       final result = await service.resolve('example.com', DnsRecordType.a);
@@ -145,8 +152,10 @@ void main() {
         }),
       );
 
-      final records = await service
-          .resolveAll('example.com', [DnsRecordType.a, DnsRecordType.mx]);
+      final records = await service.resolveAll('example.com', [
+        DnsRecordType.a,
+        DnsRecordType.mx,
+      ]);
       expect(records, hasLength(1));
       expect(records.single.data, '1.2.3.4');
     });

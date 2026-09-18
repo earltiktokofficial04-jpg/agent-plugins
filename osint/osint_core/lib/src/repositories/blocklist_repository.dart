@@ -50,8 +50,8 @@ class BlocklistRepository {
   BlocklistRepository({
     required ThreatFeedService feedService,
     List<ThreatFeed> feeds = ThreatFeeds.all,
-  })  : _feedService = feedService,
-        _feeds = feeds;
+  }) : _feedService = feedService,
+       _feeds = feeds;
 
   final ThreatFeedService _feedService;
   final List<ThreatFeed> _feeds;
@@ -83,16 +83,12 @@ class BlocklistRepository {
     }
 
     var loaded = 0;
-    final results = await mapWithConcurrency(
-      _feeds,
-      (feed) async {
-        final result = await _feedService.load(feed);
-        loaded++;
-        onProgress?.call(loaded, _feeds.length);
-        return result;
-      },
-      concurrency: concurrency,
-    );
+    final results = await mapWithConcurrency(_feeds, (feed) async {
+      final result = await _feedService.load(feed);
+      loaded++;
+      onProgress?.call(loaded, _feeds.length);
+      return result;
+    }, concurrency: concurrency);
 
     final hits = <FeedHit>[];
     final notes = <SourceNote>[];
@@ -109,16 +105,12 @@ class BlocklistRepository {
 
       final match = loadedFeed.blocks.match(target.value);
       if (match != null) {
-        hits.add(
-          FeedHit(feed: loadedFeed.feed, matchedBlock: match.raw),
-        );
+        hits.add(FeedHit(feed: loadedFeed.feed, matchedBlock: match.raw));
       }
     }
 
     // Strongest evidence first; FeedSeverity is declared worst-to-least.
-    hits.sort(
-      (a, b) => a.feed.severity.index.compareTo(b.feed.severity.index),
-    );
+    hits.sort((a, b) => a.feed.severity.index.compareTo(b.feed.severity.index));
 
     return BlocklistReport(
       address: target.value,

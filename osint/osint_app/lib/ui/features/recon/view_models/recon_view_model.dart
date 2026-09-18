@@ -6,7 +6,7 @@ import '../../../core/scan_status.dart';
 /// Drives the infrastructure recon screen.
 class ReconViewModel extends ChangeNotifier {
   ReconViewModel({required ReconRepository repository})
-      : _repository = repository;
+    : _repository = repository;
 
   final ReconRepository _repository;
 

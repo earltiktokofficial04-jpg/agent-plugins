@@ -10,6 +10,7 @@ enum DnsRecordType {
   mx(15),
   txt(16),
   aaaa(28),
+  tlsa(52),
   caa(257);
 
   const DnsRecordType(this.code);

@@ -38,8 +38,10 @@ void main() {
     });
 
     test('classifies hashes by length', () {
-      expect(Target.parse('d41d8cd98f00b204e9800998ecf8427e').kind,
-          TargetKind.md5);
+      expect(
+        Target.parse('d41d8cd98f00b204e9800998ecf8427e').kind,
+        TargetKind.md5,
+      );
       expect(
         Target.parse('da39a3ee5e6b4b0d3255bfef95601890afd80709').kind,
         TargetKind.sha1,

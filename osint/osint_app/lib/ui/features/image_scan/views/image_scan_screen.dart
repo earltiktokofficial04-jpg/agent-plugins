@@ -22,7 +22,7 @@ class ImageScanScreen extends StatefulWidget {
 
   /// Called when the user picks an indicator and what to do with it.
   final void Function(ExtractedTarget extracted, ImageScanAction action)
-      onTargetChosen;
+  onTargetChosen;
 
   @override
   State<ImageScanScreen> createState() => _ImageScanScreenState();
@@ -146,7 +146,7 @@ class _ImageScanScreenState extends State<ImageScanScreen> {
                     viewModel.usingLiveTlds
                         ? 'Checked against the live IANA TLD list.'
                         : 'Checked against the bundled TLD list — unusual '
-                            'suffixes may be missed.',
+                              'suffixes may be missed.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -158,8 +158,7 @@ class _ImageScanScreenState extends State<ImageScanScreen> {
               _IndicatorCard(
                 extracted: extracted,
                 kindLabel: _kindLabel(extracted),
-                onChosen: (action) =>
-                    widget.onTargetChosen(extracted, action),
+                onChosen: (action) => widget.onTargetChosen(extracted, action),
               ),
           ],
           if (viewModel.found.isEmpty &&
@@ -169,8 +168,9 @@ class _ImageScanScreenState extends State<ImageScanScreen> {
               title: 'Text that was read',
               child: SelectableText(
                 viewModel.readout!.recognisedText,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(fontFamily: 'monospace'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontFamily: 'monospace',
+                ),
               ),
             ),
         ],

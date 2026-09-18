@@ -39,10 +39,9 @@ class DnsOverHttpsService {
     String name,
     DnsRecordType type,
   ) async {
-    final uri = Uri.parse(endpoint).replace(queryParameters: {
-      'name': name,
-      'type': type.code.toString(),
-    });
+    final uri = Uri.parse(
+      endpoint,
+    ).replace(queryParameters: {'name': name, 'type': type.code.toString()});
 
     try {
       final response = await _client
@@ -79,8 +78,7 @@ class DnsOverHttpsService {
       for (final answer in answers) {
         if (answer is! Map<String, dynamic>) continue;
         final code = answer['type'];
-        final recordType =
-            code is int ? DnsRecordType.fromCode(code) : null;
+        final recordType = code is int ? DnsRecordType.fromCode(code) : null;
         if (recordType == null) continue;
         records.add(
           DnsRecord(
@@ -93,7 +91,10 @@ class DnsOverHttpsService {
       }
 
       if (records.isEmpty) {
-        return const SourceEmpty(sourceName, 'No records of the requested type');
+        return const SourceEmpty(
+          sourceName,
+          'No records of the requested type',
+        );
       }
       return SourceSuccess(sourceName, records);
     } catch (error) {
@@ -109,12 +110,8 @@ class DnsOverHttpsService {
     String name,
     List<DnsRecordType> types,
   ) async {
-    final results = await Future.wait(
-      types.map((type) => resolve(name, type)),
-    );
-    return [
-      for (final result in results) ...?result.valueOrNull,
-    ];
+    final results = await Future.wait(types.map((type) => resolve(name, type)));
+    return [for (final result in results) ...?result.valueOrNull];
   }
 
   /// True when [name] has any record suggesting it is registered and live.

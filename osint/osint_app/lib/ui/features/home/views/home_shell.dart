@@ -30,9 +30,9 @@ class _HomeShellState extends State<HomeShell> {
   ];
 
   void _openSettings() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen()));
   }
 
   /// Opens the image scanner and routes whatever the user picks from it into
@@ -59,9 +59,9 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   void _openSources() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const SourcesScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const SourcesScreen()));
   }
 
   @override

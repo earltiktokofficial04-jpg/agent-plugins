@@ -1,3 +1,9 @@
+# Gradle writes reports and intermediates here; `flutter create` does not
+# ignore them, so a local release build leaves them staged.
+/build
+/app/build
+.gradle/
+
 gradle-wrapper.jar
 /.gradle
 /captures/

@@ -69,10 +69,7 @@ void main() {
       final bootstrap = (await service.rdapBootstrap()).valueOrNull!;
       expect(bootstrap.serverCount, 2);
       expect(bootstrap.tldCount, 3);
-      expect(
-        bootstrap.serverFor('example.com'),
-        'https://rdap.verisign.test/',
-      );
+      expect(bootstrap.serverFor('example.com'), 'https://rdap.verisign.test/');
       expect(bootstrap.serverFor('example.my'), 'https://rdap.mynic.test/');
       expect(bootstrap.serverFor('example.nowhere'), isNull);
       expect(bootstrap.serverFor('nodots'), isNull);

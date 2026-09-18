@@ -13,19 +13,18 @@ Map<String, Object> _vtBody({
   int suspicious = 0,
   int harmless = 0,
   int undetected = 0,
-}) =>
-    {
-      'data': {
-        'attributes': {
-          'last_analysis_stats': {
-            'malicious': malicious,
-            'suspicious': suspicious,
-            'harmless': harmless,
-            'undetected': undetected,
-          },
-        },
+}) => {
+  'data': {
+    'attributes': {
+      'last_analysis_stats': {
+        'malicious': malicious,
+        'suspicious': suspicious,
+        'harmless': harmless,
+        'undetected': undetected,
       },
-    };
+    },
+  },
+};
 
 void main() {
   final keys = InMemoryApiKeyProvider({
@@ -65,8 +64,9 @@ void main() {
         keys: keys,
         client: _json(_vtBody(malicious: 5, harmless: 60)),
       );
-      final verdict =
-          (await service.lookup(Target.parse('evil.example'))).valueOrNull!;
+      final verdict = (await service.lookup(
+        Target.parse('evil.example'),
+      )).valueOrNull!;
       expect(verdict.severity, IocSeverity.malicious);
       expect(verdict.detections, 5);
       expect(verdict.totalEngines, 65);
@@ -79,8 +79,9 @@ void main() {
         keys: keys,
         client: _json(_vtBody(malicious: 1, harmless: 70)),
       );
-      final verdict =
-          (await service.lookup(Target.parse('example.com'))).valueOrNull!;
+      final verdict = (await service.lookup(
+        Target.parse('example.com'),
+      )).valueOrNull!;
       expect(verdict.severity, IocSeverity.suspicious);
     });
 
@@ -89,15 +90,17 @@ void main() {
         keys: keys,
         client: _json(_vtBody(harmless: 70, undetected: 4)),
       );
-      final verdict =
-          (await service.lookup(Target.parse('example.com'))).valueOrNull!;
+      final verdict = (await service.lookup(
+        Target.parse('example.com'),
+      )).valueOrNull!;
       expect(verdict.severity, IocSeverity.clean);
     });
 
     test('reports unknown when no engine responded at all', () async {
       final service = VirusTotalService(keys: keys, client: _json(_vtBody()));
-      final verdict =
-          (await service.lookup(Target.parse('example.com'))).valueOrNull!;
+      final verdict = (await service.lookup(
+        Target.parse('example.com'),
+      )).valueOrNull!;
       expect(verdict.severity, IocSeverity.unknown);
     });
 
@@ -173,19 +176,21 @@ void main() {
 
   group('AbuseIpdbService', () {
     Map<String, Object> body(int score, {int reports = 0}) => {
-          'data': {
-            'abuseConfidenceScore': score,
-            'totalReports': reports,
-            'countryCode': 'MY',
-            'isp': 'Example ISP',
-            'usageType': 'Data Center/Web Hosting/Transit',
-          },
-        };
+      'data': {
+        'abuseConfidenceScore': score,
+        'totalReports': reports,
+        'countryCode': 'MY',
+        'isp': 'Example ISP',
+        'usageType': 'Data Center/Web Hosting/Transit',
+      },
+    };
 
     test('maps the confidence score onto severity bands', () async {
       Future<IocSeverity> severityFor(int score) async {
-        final service =
-            AbuseIpdbService(keys: keys, client: _json(body(score)));
+        final service = AbuseIpdbService(
+          keys: keys,
+          client: _json(body(score)),
+        );
         final result = await service.check(Target.parse('1.2.3.4'));
         return result.valueOrNull!.severity;
       }
@@ -203,8 +208,9 @@ void main() {
         keys: keys,
         client: _json(body(88, reports: 42)),
       );
-      final verdict =
-          (await service.check(Target.parse('1.2.3.4'))).valueOrNull!;
+      final verdict = (await service.check(
+        Target.parse('1.2.3.4'),
+      )).valueOrNull!;
       expect(verdict.score, 88);
       expect(verdict.detections, 42);
       expect(verdict.details['Country'], 'MY');

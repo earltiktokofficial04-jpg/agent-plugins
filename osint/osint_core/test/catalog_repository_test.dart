@@ -24,34 +24,34 @@ IanaRegistryService _registry({Set<String> failing = const {}}) =>
           'tld' => http.Response('# v1\nCOM\nNET\nORG\n', 200),
           'psl' => http.Response('// x\ncom\nnet\norg\ncom.my\nco.uk\n', 200),
           'rdap' => http.Response(
-              jsonEncode({
-                'services': [
-                  [
-                    ['com', 'net'],
-                    ['https://a.test/'],
-                  ],
-                  [
-                    ['org'],
-                    ['https://b.test/'],
-                  ],
+            jsonEncode({
+              'services': [
+                [
+                  ['com', 'net'],
+                  ['https://a.test/'],
                 ],
-              }),
-              200,
-            ),
+                [
+                  ['org'],
+                  ['https://b.test/'],
+                ],
+              ],
+            }),
+            200,
+          ),
           _ => http.Response(
-              jsonEncode({
-                'operators': [
-                  {
-                    'name': 'Op',
-                    'logs': [
-                      {'url': 'https://l1.test/'},
-                      {'url': 'https://l2.test/'},
-                    ],
-                  },
-                ],
-              }),
-              200,
-            ),
+            jsonEncode({
+              'operators': [
+                {
+                  'name': 'Op',
+                  'logs': [
+                    {'url': 'https://l1.test/'},
+                    {'url': 'https://l2.test/'},
+                  ],
+                },
+              ],
+            }),
+            200,
+          ),
         };
       }),
     );
@@ -117,26 +117,33 @@ void main() {
       expect(catalog.totalCount, 10933);
     });
 
-    test('a failed registry yields a zero, stale section, not an abort',
-        () async {
-      // A catalogue missing one section is far more useful than no catalogue,
-      // provided the gap is visible rather than silently counted as zero.
-      final repository = CatalogRepository(registry: _registry(failing: {'psl'}));
-      final catalog = await repository.load();
+    test(
+      'a failed registry yields a zero, stale section, not an abort',
+      () async {
+        // A catalogue missing one section is far more useful than no catalogue,
+        // provided the gap is visible rather than silently counted as zero.
+        final repository = CatalogRepository(
+          registry: _registry(failing: {'psl'}),
+        );
+        final catalog = await repository.load();
 
-      final suffixes =
-          catalog.sections.firstWhere((s) => s.name == 'Public suffixes');
-      expect(suffixes.count, 0);
-      expect(suffixes.stale, isTrue);
-      expect(suffixes.detail, contains('Unavailable'));
-      expect(catalog.hasStaleSections, isTrue);
+        final suffixes = catalog.sections.firstWhere(
+          (s) => s.name == 'Public suffixes',
+        );
+        expect(suffixes.count, 0);
+        expect(suffixes.stale, isTrue);
+        expect(suffixes.detail, contains('Unavailable'));
+        expect(catalog.hasStaleSections, isTrue);
 
-      // The sections that did load are unaffected.
-      expect(
-        catalog.sections.firstWhere((s) => s.name == 'Top-level domains').count,
-        3,
-      );
-    });
+        // The sections that did load are unaffected.
+        expect(
+          catalog.sections
+              .firstWhere((s) => s.name == 'Top-level domains')
+              .count,
+          3,
+        );
+      },
+    );
 
     test('reports no stale sections when every registry answers', () async {
       final catalog = await CatalogRepository(registry: _registry()).load();
@@ -152,8 +159,9 @@ void main() {
 
     test('reports progress for each registry fetched', () async {
       final stages = <String>[];
-      await CatalogRepository(registry: _registry())
-          .load(onProgress: stages.add);
+      await CatalogRepository(
+        registry: _registry(),
+      ).load(onProgress: stages.add);
       expect(stages, hasLength(4));
       expect(stages.first, contains('RDAP'));
     });

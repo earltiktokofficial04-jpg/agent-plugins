@@ -70,8 +70,8 @@ class ShodanHostService {
     http.Client? client,
     this.baseUrl = 'https://api.shodan.io',
     this.timeout = const Duration(seconds: 25),
-  })  : _keys = keys,
-        _client = client ?? http.Client();
+  }) : _keys = keys,
+       _client = client ?? http.Client();
 
   final ApiKeyProvider _keys;
   final http.Client _client;
@@ -95,8 +95,9 @@ class ShodanHostService {
       );
     }
 
-    final uri = Uri.parse('$baseUrl/shodan/host/${target.value}')
-        .replace(queryParameters: {'key': key});
+    final uri = Uri.parse(
+      '$baseUrl/shodan/host/${target.value}',
+    ).replace(queryParameters: {'key': key});
 
     try {
       final response = await _client.get(uri).timeout(timeout);

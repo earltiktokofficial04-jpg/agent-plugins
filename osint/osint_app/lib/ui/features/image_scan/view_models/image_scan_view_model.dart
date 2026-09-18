@@ -9,8 +9,8 @@ class ImageScanViewModel extends ChangeNotifier {
   ImageScanViewModel({
     required ImageIndicatorScanner scanner,
     IanaRegistryService? registry,
-  })  : _scanner = scanner,
-        _registry = registry;
+  }) : _scanner = scanner,
+       _registry = registry;
 
   final ImageIndicatorScanner _scanner;
 

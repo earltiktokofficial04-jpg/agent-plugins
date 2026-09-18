@@ -13,10 +13,11 @@ import 'package:osint_core/osint_core.dart';
 /// channel round trip.
 class SecureKeyStore implements ApiKeyProvider {
   SecureKeyStore({FlutterSecureStorage? storage})
-      : _storage = storage ??
-            const FlutterSecureStorage(
-              aOptions: AndroidOptions(encryptedSharedPreferences: true),
-            );
+    : _storage =
+          storage ??
+          const FlutterSecureStorage(
+            aOptions: AndroidOptions(encryptedSharedPreferences: true),
+          );
 
   final FlutterSecureStorage _storage;
   final Map<ApiKeySource, String?> _cache = {};

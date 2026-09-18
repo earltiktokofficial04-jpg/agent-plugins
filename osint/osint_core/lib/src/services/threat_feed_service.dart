@@ -36,8 +36,8 @@ class ThreatFeedService {
     this.timeout = const Duration(seconds: 45),
     this.cacheFor = const Duration(hours: 6),
     DateTime Function() now = DateTime.now,
-  })  : _client = client ?? http.Client(),
-        _now = now;
+  }) : _client = client ?? http.Client(),
+       _now = now;
 
   final http.Client _client;
   final Duration timeout;
@@ -66,8 +66,7 @@ class ThreatFeedService {
     }
 
     try {
-      final response =
-          await _client.get(Uri.parse(feed.url)).timeout(timeout);
+      final response = await _client.get(Uri.parse(feed.url)).timeout(timeout);
 
       if (response.statusCode != 200) {
         return SourceFailure(feed.name, 'HTTP ${response.statusCode}');
@@ -82,11 +81,7 @@ class ThreatFeedService {
         return SourceEmpty(feed.name, 'Feed is currently empty');
       }
 
-      final loaded = LoadedFeed(
-        feed: feed,
-        blocks: blocks,
-        fetchedAt: _now(),
-      );
+      final loaded = LoadedFeed(feed: feed, blocks: blocks, fetchedAt: _now());
       _cache[feed.id] = loaded;
       return SourceSuccess(feed.name, loaded);
     } catch (error) {

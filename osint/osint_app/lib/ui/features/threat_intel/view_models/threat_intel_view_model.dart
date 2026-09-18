@@ -6,7 +6,7 @@ import '../../../core/scan_status.dart';
 /// Drives the IOC enrichment screen.
 class ThreatIntelViewModel extends ChangeNotifier {
   ThreatIntelViewModel({required ThreatIntelRepository repository})
-      : _repository = repository;
+    : _repository = repository;
 
   final ThreatIntelRepository _repository;
 

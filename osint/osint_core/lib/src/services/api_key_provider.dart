@@ -32,7 +32,7 @@ abstract interface class ApiKeyProvider {
 /// An in-memory [ApiKeyProvider], for tests and for running without storage.
 class InMemoryApiKeyProvider implements ApiKeyProvider {
   InMemoryApiKeyProvider([Map<ApiKeySource, String>? keys])
-      : _keys = {...?keys};
+    : _keys = {...?keys};
 
   final Map<ApiKeySource, String> _keys;
 

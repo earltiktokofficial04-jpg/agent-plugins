@@ -14,8 +14,8 @@ class VirusTotalService {
     http.Client? client,
     this.baseUrl = 'https://www.virustotal.com/api/v3',
     this.timeout = const Duration(seconds: 20),
-  })  : _keys = keys,
-        _client = client ?? http.Client();
+  }) : _keys = keys,
+       _client = client ?? http.Client();
 
   final ApiKeyProvider _keys;
   final http.Client _client;
@@ -35,8 +35,7 @@ class VirusTotalService {
       TargetKind.ipv4 || TargetKind.ipv6 => 'ip_addresses/${target.value}',
       TargetKind.md5 ||
       TargetKind.sha1 ||
-      TargetKind.sha256 =>
-        'files/${target.value}',
+      TargetKind.sha256 => 'files/${target.value}',
       TargetKind.unknown => null,
     };
     if (path == null) {
@@ -90,7 +89,10 @@ class VirusTotalService {
       }
       final attributes = data['attributes'];
       if (attributes is! Map<String, dynamic>) {
-        return const SourceEmpty(sourceName, 'No attributes for this indicator');
+        return const SourceEmpty(
+          sourceName,
+          'No attributes for this indicator',
+        );
       }
 
       return SourceSuccess(sourceName, _verdict(attributes));

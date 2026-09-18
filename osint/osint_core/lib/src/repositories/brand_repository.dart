@@ -16,8 +16,8 @@ class BrandRepository {
   BrandRepository({
     required DnsOverHttpsService dns,
     TyposquatGenerator generator = const TyposquatGenerator(),
-  })  : _dns = dns,
-        _generator = generator;
+  }) : _dns = dns,
+       _generator = generator;
 
   final DnsOverHttpsService _dns;
   final TyposquatGenerator _generator;
@@ -77,16 +77,12 @@ class BrandRepository {
     }
 
     var checked = 0;
-    final findings = await mapWithConcurrency(
-      toCheck,
-      (candidate) async {
-        final finding = await _check(candidate);
-        checked++;
-        onProgress?.call(checked, toCheck.length);
-        return finding;
-      },
-      concurrency: concurrency,
-    );
+    final findings = await mapWithConcurrency(toCheck, (candidate) async {
+      final finding = await _check(candidate);
+      checked++;
+      onProgress?.call(checked, toCheck.length);
+      return finding;
+    }, concurrency: concurrency);
 
     final registered = findings
         .where((finding) => finding != null && finding.isRegistered)

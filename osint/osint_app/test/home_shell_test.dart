@@ -14,41 +14,41 @@ import 'package:provider/provider.dart';
 
 /// A client that answers every source with canned data for example.com.
 http.Client _client() => MockClient((request) async {
-      if (request.url.host.contains('crt.sh')) {
-        return http.Response(
-          jsonEncode([
-            {
-              'issuer_name': "CN=R3, O=Let's Encrypt",
-              'common_name': 'example.com',
-              'name_value': 'example.com\nvpn.example.com',
-              'not_before': '2026-01-01T00:00:00',
-              'not_after': '2026-04-01T00:00:00',
-            },
-          ]),
-          200,
-        );
-      }
-      if (request.url.host.contains('rdap')) {
-        return http.Response(jsonEncode({'ldhName': 'example.com'}), 200);
-      }
-      if (request.url.queryParameters['type'] == '1') {
-        return http.Response(
-          jsonEncode({
-            'Status': 0,
-            'Answer': [
-              {
-                'name': 'example.com',
-                'type': 1,
-                'TTL': 60,
-                'data': '93.184.216.34',
-              },
-            ],
-          }),
-          200,
-        );
-      }
-      return http.Response(jsonEncode({'Status': 0, 'Answer': []}), 200);
-    });
+  if (request.url.host.contains('crt.sh')) {
+    return http.Response(
+      jsonEncode([
+        {
+          'issuer_name': "CN=R3, O=Let's Encrypt",
+          'common_name': 'example.com',
+          'name_value': 'example.com\nvpn.example.com',
+          'not_before': '2026-01-01T00:00:00',
+          'not_after': '2026-04-01T00:00:00',
+        },
+      ]),
+      200,
+    );
+  }
+  if (request.url.host.contains('rdap')) {
+    return http.Response(jsonEncode({'ldhName': 'example.com'}), 200);
+  }
+  if (request.url.queryParameters['type'] == '1') {
+    return http.Response(
+      jsonEncode({
+        'Status': 0,
+        'Answer': [
+          {
+            'name': 'example.com',
+            'type': 1,
+            'TTL': 60,
+            'data': '93.184.216.34',
+          },
+        ],
+      }),
+      200,
+    );
+  }
+  return http.Response(jsonEncode({'Status': 0, 'Answer': []}), 200);
+});
 
 Widget _harness() {
   final client = _client();
@@ -126,31 +126,27 @@ void main() {
     expect(find.text('Discovered hosts'), findsOneWidget);
   });
 
-  testWidgets('an invalid recon target shows guidance, not a crash',
-      (tester) async {
+  testWidgets('an invalid recon target shows guidance, not a crash', (
+    tester,
+  ) async {
     await tester.pumpWidget(_harness());
 
     await tester.enterText(find.byType(TextField).first, '8.8.8.8');
     await tester.tap(find.widgetWithText(FilledButton, 'Scan'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.textContaining('Recon needs a domain'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Recon needs a domain'), findsOneWidget);
   });
 
-  testWidgets('the scope dialog states that lookups are passive',
-      (tester) async {
+  testWidgets('the scope dialog states that lookups are passive', (
+    tester,
+  ) async {
     await tester.pumpWidget(_harness());
 
     await tester.tap(find.byTooltip('About'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Every lookup is passive'), findsOneWidget);
-    expect(
-      find.textContaining('no port scanning'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('no port scanning'), findsOneWidget);
   });
 }

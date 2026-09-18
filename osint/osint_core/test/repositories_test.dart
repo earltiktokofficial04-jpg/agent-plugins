@@ -15,10 +15,8 @@ http.Client _router(Map<String, http.Response Function(http.Request)> routes) =>
       return http.Response('unrouted: ${request.url}', 404);
     });
 
-http.Response _dnsAnswer(List<Map<String, Object>> answers) => http.Response(
-      jsonEncode({'Status': 0, 'Answer': answers}),
-      200,
-    );
+http.Response _dnsAnswer(List<Map<String, Object>> answers) =>
+    http.Response(jsonEncode({'Status': 0, 'Answer': answers}), 200);
 
 void main() {
   group('ReconRepository', () {
@@ -49,17 +47,17 @@ void main() {
           return http.Response(jsonEncode({'Status': 0, 'Answer': []}), 200);
         },
         'crt.sh': (_) => http.Response(
-              jsonEncode([
-                {
-                  'issuer_name': "CN=R3, O=Let's Encrypt",
-                  'common_name': 'example.com',
-                  'name_value': 'example.com\napi.example.com\nvpn.example.com',
-                  'not_before': '2026-01-01T00:00:00',
-                  'not_after': '2026-04-01T00:00:00',
-                },
-              ]),
-              200,
-            ),
+          jsonEncode([
+            {
+              'issuer_name': "CN=R3, O=Let's Encrypt",
+              'common_name': 'example.com',
+              'name_value': 'example.com\napi.example.com\nvpn.example.com',
+              'not_before': '2026-01-01T00:00:00',
+              'not_after': '2026-04-01T00:00:00',
+            },
+          ]),
+          200,
+        ),
       });
 
       final repository = ReconRepository(
@@ -69,8 +67,11 @@ void main() {
 
       final report = await repository.scan(Target.parse('example.com'));
       expect(report.addresses, ['93.184.216.34']);
-      expect(report.subdomains,
-          ['api.example.com', 'example.com', 'vpn.example.com']);
+      expect(report.subdomains, [
+        'api.example.com',
+        'example.com',
+        'vpn.example.com',
+      ]);
       expect(report.certificates, hasLength(1));
       expect(report.dnsRecords.any((r) => r.type == DnsRecordType.mx), isTrue);
       expect(report.notes.every((note) => note.ok), isTrue);
@@ -81,13 +82,8 @@ void main() {
       // the other's findings.
       final client = _router({
         'cloudflare-dns.com': (_) => _dnsAnswer([
-              {
-                'name': 'example.com',
-                'type': 1,
-                'TTL': 60,
-                'data': '1.2.3.4',
-              },
-            ]),
+          {'name': 'example.com', 'type': 1, 'TTL': 60, 'data': '1.2.3.4'},
+        ]),
         'crt.sh': (_) => http.Response('', 502),
       });
 
@@ -124,20 +120,23 @@ void main() {
       final client = _router({
         'cloudflare-dns.com': (request) =>
             request.url.queryParameters['type'] == '1'
-                ? _dnsAnswer([
-                    {
-                      'name': 'example.com',
-                      'type': 1,
-                      'TTL': 60,
-                      'data': '1.2.3.4',
-                    },
-                  ])
-                : http.Response(jsonEncode({'Status': 0, 'Answer': []}), 200),
+            ? _dnsAnswer([
+                {
+                  'name': 'example.com',
+                  'type': 1,
+                  'TTL': 60,
+                  'data': '1.2.3.4',
+                },
+              ])
+            : http.Response(jsonEncode({'Status': 0, 'Answer': []}), 200),
         'crt.sh': (_) => http.Response('[]', 200),
         'api.shodan.io': (_) {
           shodanCalls++;
           return http.Response(
-            jsonEncode({'ip_str': '1.2.3.4', 'ports': [443]}),
+            jsonEncode({
+              'ip_str': '1.2.3.4',
+              'ports': [443],
+            }),
             200,
           );
         },
@@ -170,20 +169,20 @@ void main() {
     test('keeps one source\'s verdict when the other has no key', () async {
       final client = _router({
         'virustotal.com': (_) => http.Response(
-              jsonEncode({
-                'data': {
-                  'attributes': {
-                    'last_analysis_stats': {
-                      'malicious': 9,
-                      'suspicious': 0,
-                      'harmless': 50,
-                      'undetected': 3,
-                    },
-                  },
+          jsonEncode({
+            'data': {
+              'attributes': {
+                'last_analysis_stats': {
+                  'malicious': 9,
+                  'suspicious': 0,
+                  'harmless': 50,
+                  'undetected': 3,
                 },
-              }),
-              200,
-            ),
+              },
+            },
+          }),
+          200,
+        ),
       });
 
       final keys = InMemoryApiKeyProvider({ApiKeySource.virusTotal: 'vt'});
@@ -222,28 +221,28 @@ void main() {
     test('assembles registration, mail posture and issuer history', () async {
       final client = _router({
         'rdap.org': (_) => http.Response(
-              jsonEncode({
-                'ldhName': 'example.com',
-                'events': [
-                  {
-                    'eventAction': 'registration',
-                    'eventDate': '2026-08-01T00:00:00Z',
-                  },
+          jsonEncode({
+            'ldhName': 'example.com',
+            'events': [
+              {
+                'eventAction': 'registration',
+                'eventDate': '2026-08-01T00:00:00Z',
+              },
+            ],
+            'entities': [
+              {
+                'roles': ['registrar'],
+                'vcardArray': [
+                  'vcard',
+                  [
+                    ['fn', <String, Object>{}, 'text', 'Example Registrar'],
+                  ],
                 ],
-                'entities': [
-                  {
-                    'roles': ['registrar'],
-                    'vcardArray': [
-                      'vcard',
-                      [
-                        ['fn', <String, Object>{}, 'text', 'Example Registrar'],
-                      ],
-                    ],
-                  },
-                ],
-              }),
-              200,
-            ),
+              },
+            ],
+          }),
+          200,
+        ),
         'cloudflare-dns.com': (request) {
           final type = request.url.queryParameters['type'];
           if (type == '15') {
@@ -259,24 +258,24 @@ void main() {
           return http.Response(jsonEncode({'Status': 0, 'Answer': []}), 200);
         },
         'crt.sh': (_) => http.Response(
-              jsonEncode([
-                {
-                  'issuer_name': 'CN=Old CA',
-                  'common_name': 'example.com',
-                  'name_value': 'example.com',
-                  'not_before': '2024-01-01T00:00:00',
-                  'not_after': '2024-04-01T00:00:00',
-                },
-                {
-                  'issuer_name': 'CN=New CA',
-                  'common_name': 'a.example.com',
-                  'name_value': 'a.example.com',
-                  'not_before': '2026-01-01T00:00:00',
-                  'not_after': '2026-04-01T00:00:00',
-                },
-              ]),
-              200,
-            ),
+          jsonEncode([
+            {
+              'issuer_name': 'CN=Old CA',
+              'common_name': 'example.com',
+              'name_value': 'example.com',
+              'not_before': '2024-01-01T00:00:00',
+              'not_after': '2024-04-01T00:00:00',
+            },
+            {
+              'issuer_name': 'CN=New CA',
+              'common_name': 'a.example.com',
+              'name_value': 'a.example.com',
+              'not_before': '2026-01-01T00:00:00',
+              'not_after': '2026-04-01T00:00:00',
+            },
+          ]),
+          200,
+        ),
       });
 
       final repository = DueDiligenceRepository(
@@ -287,34 +286,37 @@ void main() {
 
       final report = await repository.profile(Target.parse('example.com'));
       expect(report.registration!.registrar, 'Example Registrar');
-      // A domain registered weeks ago with live mail and no SPF is exactly the
-      // profile this module exists to surface.
-      expect(report.mailPosture.sendsMailUnauthenticated, isTrue);
+      // No MailSecurityService was injected, so the posture is absent rather
+      // than fabricated — the distinction this whole engine turns on.
+      expect(report.mailSecurity, isNull);
       expect(report.certificateIssuers, ['CN=New CA', 'CN=Old CA']);
       expect(report.subdomainCount, 2);
     });
 
-    test('reports an unregistered domain without failing the profile',
-        () async {
-      final client = _router({
-        'rdap.org': (_) => http.Response('', 404),
-        'cloudflare-dns.com': (_) =>
-            http.Response(jsonEncode({'Status': 3}), 200),
-        'crt.sh': (_) => http.Response('[]', 200),
-      });
+    test(
+      'reports an unregistered domain without failing the profile',
+      () async {
+        final client = _router({
+          'rdap.org': (_) => http.Response('', 404),
+          'cloudflare-dns.com': (_) =>
+              http.Response(jsonEncode({'Status': 3}), 200),
+          'crt.sh': (_) => http.Response('[]', 200),
+        });
 
-      final repository = DueDiligenceRepository(
-        rdap: RdapService(client: client),
-        dns: DnsOverHttpsService(client: client),
-        crtSh: CrtShService(client: client),
-      );
+        final repository = DueDiligenceRepository(
+          rdap: RdapService(client: client),
+          dns: DnsOverHttpsService(client: client),
+          crtSh: CrtShService(client: client),
+        );
 
-      final report = await repository.profile(Target.parse('nope.example'));
-      expect(report.registration, isNull);
-      expect(report.notes.every((note) => note.ok), isTrue);
-      final rdapNote =
-          report.notes.where((note) => note.source == 'RDAP').single;
-      expect(rdapNote.message, contains('unregistered'));
-    });
+        final report = await repository.profile(Target.parse('nope.example'));
+        expect(report.registration, isNull);
+        expect(report.notes.every((note) => note.ok), isTrue);
+        final rdapNote = report.notes
+            .where((note) => note.source == 'RDAP')
+            .single;
+        expect(rdapNote.message, contains('unregistered'));
+      },
+    );
   });
 }

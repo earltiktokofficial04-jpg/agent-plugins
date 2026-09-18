@@ -19,8 +19,8 @@ class RdapService {
     this.baseUrl = 'https://rdap.org',
     this.timeout = const Duration(seconds: 20),
     IanaRegistryService? bootstrapRegistry,
-  })  : _client = client ?? http.Client(),
-        _bootstrapRegistry = bootstrapRegistry;
+  }) : _client = client ?? http.Client(),
+       _bootstrapRegistry = bootstrapRegistry;
 
   final http.Client _client;
   final String baseUrl;
@@ -163,7 +163,8 @@ class RdapService {
     }
 
     final secureDns = json['secureDNS'];
-    final dnssecSigned = secureDns is Map<String, dynamic> &&
+    final dnssecSigned =
+        secureDns is Map<String, dynamic> &&
         secureDns['delegationSigned'] == true;
 
     return DomainRegistration(

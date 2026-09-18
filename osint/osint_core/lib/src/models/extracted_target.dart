@@ -44,11 +44,11 @@ class ExtractedTarget {
   final bool fromEmail;
 
   ExtractedTarget copyWith({int? occurrences}) => ExtractedTarget(
-        target: target,
-        raw: raw,
-        origin: origin,
-        occurrences: occurrences ?? this.occurrences,
-        wasDefanged: wasDefanged,
-        fromEmail: fromEmail,
-      );
+    target: target,
+    raw: raw,
+    origin: origin,
+    occurrences: occurrences ?? this.occurrences,
+    wasDefanged: wasDefanged,
+    fromEmail: fromEmail,
+  );
 }

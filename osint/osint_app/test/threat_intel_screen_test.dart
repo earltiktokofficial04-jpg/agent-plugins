@@ -34,9 +34,7 @@ Widget _harness(http.Client client, {List<ThreatFeed> feeds = const [_feed]}) {
   return ChangeNotifierProvider.value(
     value: viewModel,
     child: MaterialApp(
-      home: Scaffold(
-        body: ThreatIntelScreen(onOpenSettings: () {}),
-      ),
+      home: Scaffold(body: ThreatIntelScreen(onOpenSettings: () {})),
     ),
   );
 }
@@ -48,13 +46,17 @@ Future<void> _lookup(WidgetTester tester, String indicator) async {
 }
 
 void main() {
-  testWidgets('renders a feed hit with the block that matched',
-      (tester) async {
+  testWidgets('renders a feed hit with the block that matched', (tester) async {
     final client = MockClient((request) async {
       if (request.url.host.contains('feeds.test')) {
         return http.Response('1.2.3.0/24\n', 200);
       }
-      return http.Response(jsonEncode({'pulse_info': {'count': 0}}), 200);
+      return http.Response(
+        jsonEncode({
+          'pulse_info': {'count': 0},
+        }),
+        200,
+      );
     });
 
     await tester.pumpWidget(_harness(client));
@@ -66,15 +68,21 @@ void main() {
     expect(find.text('Malicious'), findsWidgets);
   });
 
-  testWidgets('says plainly that a failed feed load is not an all-clear',
-      (tester) async {
+  testWidgets('says plainly that a failed feed load is not an all-clear', (
+    tester,
+  ) async {
     // The most dangerous thing this screen could do is let a failed download
     // read as a clean result.
     final client = MockClient((request) async {
       if (request.url.host.contains('feeds.test')) {
         return http.Response('', 503);
       }
-      return http.Response(jsonEncode({'pulse_info': {'count': 0}}), 200);
+      return http.Response(
+        jsonEncode({
+          'pulse_info': {'count': 0},
+        }),
+        200,
+      );
     });
 
     await tester.pumpWidget(_harness(client));
@@ -88,7 +96,12 @@ void main() {
       if (request.url.host.contains('feeds.test')) {
         return http.Response('9.9.9.0/24\n', 200);
       }
-      return http.Response(jsonEncode({'pulse_info': {'count': 0}}), 200);
+      return http.Response(
+        jsonEncode({
+          'pulse_info': {'count': 0},
+        }),
+        200,
+      );
     });
 
     await tester.pumpWidget(_harness(client));
@@ -99,7 +112,12 @@ void main() {
 
   testWidgets('shows no blocklist card for a domain target', (tester) async {
     final client = MockClient(
-      (_) async => http.Response(jsonEncode({'pulse_info': {'count': 0}}), 200),
+      (_) async => http.Response(
+        jsonEncode({
+          'pulse_info': {'count': 0},
+        }),
+        200,
+      ),
     );
 
     await tester.pumpWidget(_harness(client, feeds: const []));

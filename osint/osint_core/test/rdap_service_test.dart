@@ -16,9 +16,18 @@ void main() {
               'ldhName': 'EXAMPLE.COM',
               'status': ['client transfer prohibited'],
               'events': [
-                {'eventAction': 'registration', 'eventDate': '1995-08-14T04:00:00Z'},
-                {'eventAction': 'expiration', 'eventDate': '2027-08-13T04:00:00Z'},
-                {'eventAction': 'last changed', 'eventDate': '2026-08-14T07:01:44Z'},
+                {
+                  'eventAction': 'registration',
+                  'eventDate': '1995-08-14T04:00:00Z',
+                },
+                {
+                  'eventAction': 'expiration',
+                  'eventDate': '2027-08-13T04:00:00Z',
+                },
+                {
+                  'eventAction': 'last changed',
+                  'eventDate': '2026-08-14T07:01:44Z',
+                },
               ],
               'nameservers': [
                 {'ldhName': 'A.IANA-SERVERS.NET'},
@@ -32,7 +41,12 @@ void main() {
                     'vcard',
                     [
                       ['version', {}, 'text', '4.0'],
-                      ['fn', {}, 'text', 'RESERVED-Internet Assigned Numbers Authority'],
+                      [
+                        'fn',
+                        {},
+                        'text',
+                        'RESERVED-Internet Assigned Numbers Authority',
+                      ],
                     ],
                   ],
                 },
@@ -49,7 +63,10 @@ void main() {
       expect(registration.registrar, contains('Internet Assigned Numbers'));
       expect(registration.registered, DateTime.utc(1995, 8, 14, 4));
       expect(registration.expires, DateTime.utc(2027, 8, 13, 4));
-      expect(registration.nameservers, ['a.iana-servers.net', 'b.iana-servers.net']);
+      expect(registration.nameservers, [
+        'a.iana-servers.net',
+        'b.iana-servers.net',
+      ]);
       expect(registration.dnssecSigned, isTrue);
       expect(registration.statuses, ['client transfer prohibited']);
     });
@@ -79,38 +96,40 @@ void main() {
       expect(registration.dnssecSigned, isFalse);
     });
 
-    test('does not call a domain unregistered when its TLD has no RDAP',
-        () async {
-      // .my publishes no RDAP service, so rdap.org 404s for every .my domain.
-      // Reading that as "unregistered" would report live Malaysian company
-      // domains as non-existent in a due-diligence check.
-      final client = MockClient((request) async {
-        if (request.url.toString().contains('rdap/dns.json')) {
-          return http.Response(
-            jsonEncode({
-              'services': [
-                [
-                  ['com'],
-                  ['https://rdap.verisign.test/'],
+    test(
+      'does not call a domain unregistered when its TLD has no RDAP',
+      () async {
+        // .my publishes no RDAP service, so rdap.org 404s for every .my domain.
+        // Reading that as "unregistered" would report live Malaysian company
+        // domains as non-existent in a due-diligence check.
+        final client = MockClient((request) async {
+          if (request.url.toString().contains('rdap/dns.json')) {
+            return http.Response(
+              jsonEncode({
+                'services': [
+                  [
+                    ['com'],
+                    ['https://rdap.verisign.test/'],
+                  ],
                 ],
-              ],
-            }),
-            200,
-          );
-        }
-        return http.Response('', 404);
-      });
+              }),
+              200,
+            );
+          }
+          return http.Response('', 404);
+        });
 
-      final service = RdapService(
-        client: client,
-        bootstrapRegistry: IanaRegistryService(client: client),
-      );
+        final service = RdapService(
+          client: client,
+          bootstrapRegistry: IanaRegistryService(client: client),
+        );
 
-      final result = await service.domain('mynic.my');
-      final empty = result as SourceEmpty<DomainRegistration>;
-      expect(empty.detail, contains('No RDAP service published for .my'));
-      expect(empty.detail, isNot(contains('appears unregistered')));
-    });
+        final result = await service.domain('mynic.my');
+        final empty = result as SourceEmpty<DomainRegistration>;
+        expect(empty.detail, contains('No RDAP service published for .my'));
+        expect(empty.detail, isNot(contains('appears unregistered')));
+      },
+    );
 
     test('does call it unregistered when its TLD does publish RDAP', () async {
       // .com is covered, so a 404 from Verisign really does mean the domain
@@ -156,77 +175,82 @@ void main() {
       expect(detail, contains('may publish no RDAP service'));
     });
 
-    test('queries the TLD\'s own registry server when the bootstrap has one',
-        () async {
-      // The whole point of enumerating 590 registry servers is to ask them
-      // directly; going through a redirector would make that count decorative.
-      final requested = <String>[];
-      final client = MockClient((request) async {
-        final url = request.url.toString();
-        requested.add(url);
-        if (url.contains('rdap/dns.json')) {
-          return http.Response(
-            jsonEncode({
-              'services': [
-                [
-                  ['my'],
-                  ['https://rdap.mynic.test/rdap/'],
+    test(
+      'queries the TLD\'s own registry server when the bootstrap has one',
+      () async {
+        // The whole point of enumerating 590 registry servers is to ask them
+        // directly; going through a redirector would make that count decorative.
+        final requested = <String>[];
+        final client = MockClient((request) async {
+          final url = request.url.toString();
+          requested.add(url);
+          if (url.contains('rdap/dns.json')) {
+            return http.Response(
+              jsonEncode({
+                'services': [
+                  [
+                    ['my'],
+                    ['https://rdap.mynic.test/rdap/'],
+                  ],
                 ],
-              ],
-            }),
-            200,
-          );
-        }
-        return http.Response(jsonEncode({'ldhName': 'example.my'}), 200);
-      });
+              }),
+              200,
+            );
+          }
+          return http.Response(jsonEncode({'ldhName': 'example.my'}), 200);
+        });
 
-      final service = RdapService(
-        client: client,
-        bootstrapRegistry: IanaRegistryService(client: client),
-      );
+        final service = RdapService(
+          client: client,
+          bootstrapRegistry: IanaRegistryService(client: client),
+        );
 
-      final registration = (await service.domain('example.my')).valueOrNull!;
-      expect(
-        requested.last,
-        'https://rdap.mynic.test/rdap/domain/example.my',
-        reason: 'trailing slash in the bootstrap entry must not double up',
-      );
-      expect(registration.registryServer, 'https://rdap.mynic.test/rdap/');
-      expect(requested.any((url) => url.contains('rdap.org')), isFalse);
-    });
+        final registration = (await service.domain('example.my')).valueOrNull!;
+        expect(
+          requested.last,
+          'https://rdap.mynic.test/rdap/domain/example.my',
+          reason: 'trailing slash in the bootstrap entry must not double up',
+        );
+        expect(registration.registryServer, 'https://rdap.mynic.test/rdap/');
+        expect(requested.any((url) => url.contains('rdap.org')), isFalse);
+      },
+    );
 
-    test('falls back to the redirector for a TLD with no RDAP server',
-        () async {
-      final requested = <String>[];
-      final client = MockClient((request) async {
-        final url = request.url.toString();
-        requested.add(url);
-        if (url.contains('rdap/dns.json')) {
-          return http.Response(
-            jsonEncode({
-              'services': [
-                [
-                  ['com'],
-                  ['https://rdap.verisign.test/'],
+    test(
+      'falls back to the redirector for a TLD with no RDAP server',
+      () async {
+        final requested = <String>[];
+        final client = MockClient((request) async {
+          final url = request.url.toString();
+          requested.add(url);
+          if (url.contains('rdap/dns.json')) {
+            return http.Response(
+              jsonEncode({
+                'services': [
+                  [
+                    ['com'],
+                    ['https://rdap.verisign.test/'],
+                  ],
                 ],
-              ],
-            }),
-            200,
-          );
-        }
-        return http.Response(jsonEncode({'ldhName': 'example.nowhere'}), 200);
-      });
+              }),
+              200,
+            );
+          }
+          return http.Response(jsonEncode({'ldhName': 'example.nowhere'}), 200);
+        });
 
-      final service = RdapService(
-        client: client,
-        bootstrapRegistry: IanaRegistryService(client: client),
-      );
+        final service = RdapService(
+          client: client,
+          bootstrapRegistry: IanaRegistryService(client: client),
+        );
 
-      final registration =
-          (await service.domain('example.nowhere')).valueOrNull!;
-      expect(requested.last, 'https://rdap.org/domain/example.nowhere');
-      expect(registration.registryServer, 'https://rdap.org');
-    });
+        final registration = (await service.domain(
+          'example.nowhere',
+        )).valueOrNull!;
+        expect(requested.last, 'https://rdap.org/domain/example.nowhere');
+        expect(registration.registryServer, 'https://rdap.org');
+      },
+    );
 
     test('falls back when the bootstrap itself cannot be fetched', () async {
       final client = MockClient((request) async {
@@ -299,29 +323,28 @@ void main() {
       expect(bootstrapFetches, 1);
     });
 
-    test('uses the redirector when no bootstrap registry is supplied',
-        () async {
-      final requested = <String>[];
-      final service = RdapService(
-        client: MockClient((request) async {
-          requested.add(request.url.toString());
-          return http.Response(jsonEncode({'ldhName': 'example.com'}), 200);
-        }),
-      );
+    test(
+      'uses the redirector when no bootstrap registry is supplied',
+      () async {
+        final requested = <String>[];
+        final service = RdapService(
+          client: MockClient((request) async {
+            requested.add(request.url.toString());
+            return http.Response(jsonEncode({'ldhName': 'example.com'}), 200);
+          }),
+        );
 
-      await service.domain('example.com');
-      expect(requested, ['https://rdap.org/domain/example.com']);
-    });
+        await service.domain('example.com');
+        expect(requested, ['https://rdap.org/domain/example.com']);
+      },
+    );
 
     test('ageAt measures registration age from the injected clock', () {
       final registration = DomainRegistration(
         domain: 'example.com',
         registered: DateTime.utc(2026, 1, 1),
       );
-      expect(
-        registration.ageAt(DateTime.utc(2026, 1, 31))!.inDays,
-        30,
-      );
+      expect(registration.ageAt(DateTime.utc(2026, 1, 31))!.inDays, 30);
       expect(
         const DomainRegistration(domain: 'x.com').ageAt(DateTime.utc(2026)),
         isNull,

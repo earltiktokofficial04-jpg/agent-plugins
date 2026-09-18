@@ -39,7 +39,8 @@ class Ipv4Cidr {
   }
 
   /// True when [address], given as a 32-bit integer, falls inside this block.
-  bool containsInt(int address) => (address & _maskFor(prefixLength)) == network;
+  bool containsInt(int address) =>
+      (address & _maskFor(prefixLength)) == network;
 
   /// True when [address] parses as IPv4 and falls inside this block.
   bool contains(String address) {
@@ -84,8 +85,10 @@ class Ipv4Cidr {
 class CidrSet {
   CidrSet(Iterable<Ipv4Cidr> blocks) {
     for (final block in blocks) {
-      _byPrefix.putIfAbsent(block.prefixLength, () => <int, Ipv4Cidr>{})
-          [block.network] = block;
+      _byPrefix.putIfAbsent(
+        block.prefixLength,
+        () => <int, Ipv4Cidr>{},
+      )[block.network] = block;
     }
     _prefixLengths = _byPrefix.keys.toList()..sort();
   }

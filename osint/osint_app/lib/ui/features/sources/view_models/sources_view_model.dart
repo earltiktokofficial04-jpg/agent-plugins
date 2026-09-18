@@ -10,7 +10,7 @@ import '../../../core/scan_status.dart';
 /// the app was built.
 class SourcesViewModel extends ChangeNotifier {
   SourcesViewModel({required CatalogRepository repository})
-      : _repository = repository;
+    : _repository = repository;
 
   final CatalogRepository _repository;
 

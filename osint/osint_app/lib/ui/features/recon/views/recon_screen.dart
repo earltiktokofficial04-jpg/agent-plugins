@@ -149,17 +149,17 @@ class _ReconScreenState extends State<ReconScreen> {
                   'Where these names pointed in the past, which live DNS '
                   'cannot show.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color:
-                            Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
               for (final record in report.passiveDns.take(40))
                 RecordRow(
                   leading: record.recordType.isEmpty ? null : record.recordType,
-                  text: '${record.hostname} → ${record.address}'
+                  text:
+                      '${record.hostname} → ${record.address}'
                       '${record.lastSeen == null ? '' : '  (last seen '
-                          '${record.lastSeen!.toIso8601String().split('T').first})'}',
+                                '${record.lastSeen!.toIso8601String().split('T').first})'}',
                 ),
             ],
           ),
@@ -177,9 +177,8 @@ class _ReconScreenState extends State<ReconScreen> {
                   'Paths the Internet Archive captured. These may no longer '
                   'be linked or served.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color:
-                            Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
               for (final archived in report.archivedUrls.take(60))
@@ -225,8 +224,8 @@ class _ReconScreenState extends State<ReconScreen> {
           trailing: Text(
             'free',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -249,8 +248,8 @@ class _ReconScreenState extends State<ReconScreen> {
                 Text(
                   'Software fingerprinted',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 for (final cpe in entry.value.cpes) RecordRow(text: cpe),
               ],
@@ -260,8 +259,8 @@ class _ReconScreenState extends State<ReconScreen> {
                   '${entry.value.vulnerabilities.length} CVE leads — inferred '
                   'from version banners, verify before acting',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
+                    color: Theme.of(context).colorScheme.error,
+                  ),
                 ),
                 for (final cve in entry.value.vulnerabilities.take(25))
                   RecordRow(text: cve),
@@ -281,10 +280,7 @@ class _ReconScreenState extends State<ReconScreen> {
                   value: entry.value.organisation,
                 ),
               if (entry.value.operatingSystem.isNotEmpty)
-                KeyValueRow(
-                  label: 'OS',
-                  value: entry.value.operatingSystem,
-                ),
+                KeyValueRow(label: 'OS', value: entry.value.operatingSystem),
               KeyValueRow(
                 label: 'Open ports',
                 value: entry.value.ports.isEmpty
@@ -304,8 +300,8 @@ class _ReconScreenState extends State<ReconScreen> {
                 Text(
                   'Reverse hostnames — other names on this address',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 for (final hostname in entry.value.hostnames)
                   RecordRow(text: hostname),
@@ -317,8 +313,8 @@ class _ReconScreenState extends State<ReconScreen> {
                 Text(
                   'CVE leads (inferred from banners — verify before acting)',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
+                    color: Theme.of(context).colorScheme.error,
+                  ),
                 ),
                 for (final cve in entry.value.vulnerabilities)
                   RecordRow(text: cve),
@@ -356,8 +352,9 @@ class _Rejection extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.error),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
             ),
           ),
         ],

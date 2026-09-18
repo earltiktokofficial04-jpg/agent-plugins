@@ -63,10 +63,11 @@ void main() {
       });
 
       final report = await repository.check(Target.parse('1.2.3.4'));
-      expect(
-        report.hits.map((hit) => hit.feed.severity).toList(),
-        [FeedSeverity.high, FeedSeverity.medium, FeedSeverity.contextual],
-      );
+      expect(report.hits.map((hit) => hit.feed.severity).toList(), [
+        FeedSeverity.high,
+        FeedSeverity.medium,
+        FeedSeverity.contextual,
+      ]);
     });
 
     test('a contextual-only hit is not treated as serious', () async {

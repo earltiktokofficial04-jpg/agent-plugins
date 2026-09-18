@@ -111,7 +111,9 @@ void main() {
     test('handles a large set correctly', () {
       // Real feeds run to tens of thousands of entries; make sure bucketing
       // by prefix length does not lose any of them.
-      final lines = [for (var i = 0; i < 5000; i++) '10.${i ~/ 256}.${i % 256}.0/24'];
+      final lines = [
+        for (var i = 0; i < 5000; i++) '10.${i ~/ 256}.${i % 256}.0/24',
+      ];
       final set = CidrSet.parse(lines);
       expect(set.length, 5000);
       expect(set.contains('10.0.0.1'), isTrue);

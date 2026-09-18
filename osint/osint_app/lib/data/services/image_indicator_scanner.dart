@@ -41,10 +41,11 @@ class MlKitImageScanner implements ImageIndicatorScanner {
     ImagePicker? picker,
     TextRecognizer? textRecognizer,
     BarcodeScanner? barcodeScanner,
-  })  : _picker = picker ?? ImagePicker(),
-        _textRecognizer =
-            textRecognizer ?? TextRecognizer(script: TextRecognitionScript.latin),
-        _barcodeScanner = barcodeScanner ?? BarcodeScanner();
+  }) : _picker = picker ?? ImagePicker(),
+       _textRecognizer =
+           textRecognizer ??
+           TextRecognizer(script: TextRecognitionScript.latin),
+       _barcodeScanner = barcodeScanner ?? BarcodeScanner();
 
   final ImagePicker _picker;
   final TextRecognizer _textRecognizer;

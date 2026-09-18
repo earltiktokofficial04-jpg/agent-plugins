@@ -42,10 +42,9 @@ class _DueDiligenceScreenState extends State<DueDiligenceScreen> {
             padding: const EdgeInsets.only(top: 12),
             child: Text(
               viewModel.rejection,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: Theme.of(context).colorScheme.error),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+              ),
             ),
           ),
         if (viewModel.status == ScanStatus.idle)
@@ -68,7 +67,7 @@ class _DueDiligenceScreenState extends State<DueDiligenceScreen> {
   ) {
     final theme = Theme.of(context);
     final registration = report.registration;
-    final posture = report.mailPosture;
+    final mail = report.mailSecurity;
     final age = viewModel.registrationAge;
 
     return [
@@ -97,7 +96,8 @@ class _DueDiligenceScreenState extends State<DueDiligenceScreen> {
                   if (age != null)
                     KeyValueRow(
                       label: 'Age',
-                      value: '${(age.inDays / 365).toStringAsFixed(1)} years '
+                      value:
+                          '${(age.inDays / 365).toStringAsFixed(1)} years '
                           '(${age.inDays} days)',
                     ),
                   KeyValueRow(
@@ -120,40 +120,104 @@ class _DueDiligenceScreenState extends State<DueDiligenceScreen> {
                       child: Text(
                         'Registered within the last 90 days — treat any '
                         'business claim made on this domain with caution.',
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: theme.colorScheme.error),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.error,
+                        ),
                       ),
                     ),
                 ],
               ),
       ),
-      SectionCard(
-        title: 'Mail posture',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            KeyValueRow(
-              label: 'Accepts mail',
-              value: posture.hasMx ? 'yes' : 'no',
-            ),
-            KeyValueRow(label: 'SPF', value: posture.hasSpf ? 'yes' : 'no'),
-            KeyValueRow(
-              label: 'DMARC',
-              value: posture.hasDmarc ? 'yes' : 'no',
-            ),
-            if (posture.sendsMailUnauthenticated)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  'Accepts mail but publishes no SPF record — the domain is '
-                  'spoofable.',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.error),
-                ),
+      if (mail != null)
+        SectionCard(
+          title: 'Mail security',
+          trailing: mail.isSpoofable
+              ? Chip(
+                  label: const Text('Spoofable'),
+                  visualDensity: VisualDensity.compact,
+                  backgroundColor: theme.colorScheme.errorContainer,
+                  labelStyle: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onErrorContainer,
+                    fontWeight: FontWeight.w700,
+                  ),
+                )
+              : null,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              KeyValueRow(
+                label: 'Accepts mail',
+                value: mail.acceptsMail
+                    ? mail.mailExchangers.join(', ')
+                    : 'no MX records',
               ),
-          ],
+              KeyValueRow(
+                label: 'SPF',
+                value: mail.spf == null
+                    ? 'not published'
+                    : '${_spfLabel(mail.spf!.qualifier)} · '
+                          '${mail.spf!.lookupCount} DNS lookups',
+              ),
+              KeyValueRow(
+                label: 'DMARC',
+                value: mail.dmarc == null
+                    ? 'not published'
+                    : 'p=${mail.dmarc!.policy.name}'
+                          '${mail.dmarc!.subdomainPolicy == null ? '' : ' sp=${mail.dmarc!.subdomainPolicy!.name}'}'
+                          '${mail.dmarc!.percentage == 100 ? '' : ' pct=${mail.dmarc!.percentage}'}',
+              ),
+              KeyValueRow(
+                label: 'MTA-STS',
+                value: mail.hasMtaSts ? 'published' : 'not published',
+              ),
+              KeyValueRow(
+                label: 'DANE',
+                value: mail.hasDane ? 'published' : 'not published',
+              ),
+              if (mail.findings.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                for (final finding in mail.findings)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.circle,
+                          size: 8,
+                          color: _severityColour(finding.severity, theme),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                finding.title,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: _severityColour(
+                                    finding.severity,
+                                    theme,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                finding.detail,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ],
+          ),
         ),
-      ),
       if (registration != null && registration.nameservers.isNotEmpty)
         SectionCard(
           title: 'Nameservers',
@@ -190,6 +254,23 @@ class _DueDiligenceScreenState extends State<DueDiligenceScreen> {
     ];
   }
 
-  static String _date(DateTime? value) =>
-      value == null ? 'not published' : value.toIso8601String().split('T').first;
+  /// A short, plain description of what an SPF qualifier means.
+  static String _spfLabel(SpfQualifier qualifier) => switch (qualifier) {
+    SpfQualifier.fail => 'enforcing (-all)',
+    SpfQualifier.softFail => 'soft-fail only (~all)',
+    SpfQualifier.neutral => 'neutral (?all)',
+    SpfQualifier.pass => 'authorises everyone (+all)',
+    SpfQualifier.none => 'no all mechanism',
+  };
+
+  static Color _severityColour(MailFindingSeverity severity, ThemeData theme) =>
+      switch (severity) {
+        MailFindingSeverity.high => theme.colorScheme.error,
+        MailFindingSeverity.medium => const Color(0xFFB26A00),
+        MailFindingSeverity.low => theme.colorScheme.onSurfaceVariant,
+      };
+
+  static String _date(DateTime? value) => value == null
+      ? 'not published'
+      : value.toIso8601String().split('T').first;
 }

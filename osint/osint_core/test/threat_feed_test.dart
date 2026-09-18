@@ -137,14 +137,8 @@ void main() {
     test('Tor exits are classed as contextual, not malicious', () {
       // Running a Tor exit is not an accusation; classing it as malicious
       // would make the tool cry wolf on every privacy-conscious user.
-      expect(
-        ThreatFeeds.byId('tor_exits')!.severity,
-        FeedSeverity.contextual,
-      );
-      expect(
-        ThreatFeeds.byId('spamhaus_drop')!.severity,
-        FeedSeverity.high,
-      );
+      expect(ThreatFeeds.byId('tor_exits')!.severity, FeedSeverity.contextual);
+      expect(ThreatFeeds.byId('spamhaus_drop')!.severity, FeedSeverity.high);
     });
   });
 }

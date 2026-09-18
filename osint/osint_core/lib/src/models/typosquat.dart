@@ -18,10 +18,7 @@ enum TyposquatTechnique {
 
 /// A generated domain that resembles the brand being protected.
 class TyposquatCandidate {
-  const TyposquatCandidate({
-    required this.domain,
-    required this.technique,
-  });
+  const TyposquatCandidate({required this.domain, required this.technique});
 
   final String domain;
   final TyposquatTechnique technique;

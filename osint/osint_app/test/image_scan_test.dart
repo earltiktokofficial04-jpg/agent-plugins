@@ -55,28 +55,31 @@ void main() {
       expect(scanner.calls, [ImageSource2.gallery]);
     });
 
-    test('attributes a value to the QR code when both sources have it',
-        () async {
-      // A QR payload is machine-readable and exact; OCR of the same string
-      // may be misread, so the code is the better provenance.
-      final viewModel = ImageScanViewModel(
-        scanner: _FakeScanner(
-          readout: _readout(
-            text: 'pay-now.example.com printed underneath',
-            codes: ['https://pay-now.example.com/qr'],
+    test(
+      'attributes a value to the QR code when both sources have it',
+      () async {
+        // A QR payload is machine-readable and exact; OCR of the same string
+        // may be misread, so the code is the better provenance.
+        final viewModel = ImageScanViewModel(
+          scanner: _FakeScanner(
+            readout: _readout(
+              text: 'pay-now.example.com printed underneath',
+              codes: ['https://pay-now.example.com/qr'],
+            ),
           ),
-        ),
-      );
+        );
 
-      await viewModel.scanImage(ImageSource2.camera);
+        await viewModel.scanImage(ImageSource2.camera);
 
-      expect(viewModel.found, hasLength(1));
-      expect(viewModel.found.single.origin, TargetOrigin.code);
-    });
+        expect(viewModel.found, hasLength(1));
+        expect(viewModel.found.single.origin, TargetOrigin.code);
+      },
+    );
 
     test('a cancelled picker is not an error', () async {
-      final viewModel =
-          ImageScanViewModel(scanner: _FakeScanner(readout: null));
+      final viewModel = ImageScanViewModel(
+        scanner: _FakeScanner(readout: null),
+      );
 
       await viewModel.scanImage(ImageSource2.camera);
 
@@ -86,8 +89,7 @@ void main() {
     });
 
     test('a thrown platform error is reported, not swallowed', () async {
-      final viewModel =
-          ImageScanViewModel(scanner: _FakeScanner(throws: true));
+      final viewModel = ImageScanViewModel(scanner: _FakeScanner(throws: true));
 
       await viewModel.scanImage(ImageSource2.camera);
 
@@ -95,22 +97,28 @@ void main() {
       expect(viewModel.message, contains('Could not read the image'));
     });
 
-    test('distinguishes an unreadable image from one with no indicators',
-        () async {
-      final blank = ImageScanViewModel(scanner: _FakeScanner(readout: _readout()));
-      await blank.scanImage(ImageSource2.camera);
-      expect(blank.message, contains('Nothing readable'));
+    test(
+      'distinguishes an unreadable image from one with no indicators',
+      () async {
+        final blank = ImageScanViewModel(
+          scanner: _FakeScanner(readout: _readout()),
+        );
+        await blank.scanImage(ImageSource2.camera);
+        expect(blank.message, contains('Nothing readable'));
 
-      final prose = ImageScanViewModel(
-        scanner: _FakeScanner(
-          readout: _readout(text: 'Meeting notes from Tuesday, no links here'),
-        ),
-      );
-      await prose.scanImage(ImageSource2.camera);
-      expect(prose.message, contains('no domain, address or hash'));
-      // The text is retained so the user can see what OCR actually read.
-      expect(prose.readout!.recognisedText, contains('Meeting notes'));
-    });
+        final prose = ImageScanViewModel(
+          scanner: _FakeScanner(
+            readout: _readout(
+              text: 'Meeting notes from Tuesday, no links here',
+            ),
+          ),
+        );
+        await prose.scanImage(ImageSource2.camera);
+        expect(prose.message, contains('no domain, address or hash'));
+        // The text is retained so the user can see what OCR actually read.
+        expect(prose.readout!.recognisedText, contains('Meeting notes'));
+      },
+    );
 
     test('the live TLD list suppresses filename false positives', () async {
       // With the bundled list, an unusual TLD is missed; with the live IANA
@@ -132,11 +140,9 @@ void main() {
       expect(viewModel.usingLiveTlds, isTrue);
 
       await viewModel.scanImage(ImageSource2.gallery);
-      expect(
-        viewModel.found.map((e) => e.target.value),
-        ['brand.zuerich'],
-        reason: 'report.pdf must still be rejected',
-      );
+      expect(viewModel.found.map((e) => e.target.value), [
+        'brand.zuerich',
+      ], reason: 'report.pdf must still be rejected');
     });
 
     test('a failed TLD fetch leaves the bundled list in place', () async {
@@ -172,13 +178,10 @@ void main() {
     Widget harness(
       ImageScanViewModel viewModel,
       void Function(ExtractedTarget, ImageScanAction) onChosen,
-    ) =>
-        ChangeNotifierProvider.value(
-          value: viewModel,
-          child: MaterialApp(
-            home: ImageScanScreen(onTargetChosen: onChosen),
-          ),
-        );
+    ) => ChangeNotifierProvider.value(
+      value: viewModel,
+      child: MaterialApp(home: ImageScanScreen(onTargetChosen: onChosen)),
+    );
 
     testWidgets('offers both camera and gallery', (tester) async {
       await tester.pumpWidget(
@@ -189,8 +192,9 @@ void main() {
       expect(find.textContaining('never uploaded'), findsOneWidget);
     });
 
-    testWidgets('renders a found indicator with its origin and raw text',
-        (tester) async {
+    testWidgets('renders a found indicator with its origin and raw text', (
+      tester,
+    ) async {
       final viewModel = ImageScanViewModel(
         scanner: _FakeScanner(
           readout: _readout(text: 'Go To EVIL-CORP.COM now'),
@@ -205,13 +209,10 @@ void main() {
       expect(find.text('domain'), findsOneWidget);
     });
 
-    testWidgets('offers Recon for a domain but not for a hash',
-        (tester) async {
+    testWidgets('offers Recon for a domain but not for a hash', (tester) async {
       final viewModel = ImageScanViewModel(
         scanner: _FakeScanner(
-          readout: _readout(
-            text: 'evil.com d41d8cd98f00b204e9800998ecf8427e',
-          ),
+          readout: _readout(text: 'evil.com d41d8cd98f00b204e9800998ecf8427e'),
         ),
       );
       await tester.pumpWidget(harness(viewModel, (_, __) {}));
@@ -249,9 +250,7 @@ void main() {
 
     testWidgets('warns when indicators arrived defanged', (tester) async {
       final viewModel = ImageScanViewModel(
-        scanner: _FakeScanner(
-          readout: _readout(text: 'IOC: login-bank[.]tk'),
-        ),
+        scanner: _FakeScanner(readout: _readout(text: 'IOC: login-bank[.]tk')),
       );
       await tester.pumpWidget(harness(viewModel, (_, __) {}));
       await viewModel.scanImage(ImageSource2.gallery);
@@ -260,8 +259,9 @@ void main() {
       expect(find.textContaining('written defanged'), findsOneWidget);
     });
 
-    testWidgets('shows the OCR text when nothing could be extracted',
-        (tester) async {
+    testWidgets('shows the OCR text when nothing could be extracted', (
+      tester,
+    ) async {
       final viewModel = ImageScanViewModel(
         scanner: _FakeScanner(
           readout: _readout(text: 'Just some prose with no indicators'),
@@ -272,10 +272,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Text that was read'), findsOneWidget);
-      expect(
-        find.text('Just some prose with no indicators'),
-        findsOneWidget,
-      );
+      expect(find.text('Just some prose with no indicators'), findsOneWidget);
     });
   });
 }

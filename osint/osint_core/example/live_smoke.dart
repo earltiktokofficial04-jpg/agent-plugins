@@ -15,8 +15,7 @@ Future<void> main(List<String> args) async {
 
   // Respect any proxy the environment mandates, which corporate networks and
   // sandboxes both tend to.
-  final inner = HttpClient()
-    ..findProxy = HttpClient.findProxyFromEnvironment;
+  final inner = HttpClient()..findProxy = HttpClient.findProxyFromEnvironment;
   final client = IOClient(inner);
 
   final dns = DnsOverHttpsService(client: client);
@@ -52,8 +51,10 @@ Future<void> main(List<String> args) async {
     switch (await AsnLookupService(dns: dns).lookup(Target.parse(address))) {
       case SourceSuccess(:final value):
         stdout.writeln('  ${value.label}');
-        stdout.writeln('  prefix: ${value.prefix}  '
-            'country: ${value.countryCode}  registry: ${value.registry}');
+        stdout.writeln(
+          '  prefix: ${value.prefix}  '
+          'country: ${value.countryCode}  registry: ${value.registry}',
+        );
       case SourceEmpty(:final detail):
         stdout.writeln('  empty: $detail');
       case SourceFailure(:final message):
@@ -61,8 +62,9 @@ Future<void> main(List<String> args) async {
     }
 
     stdout.writeln('== Shodan InternetDB (keyless) ==');
-    switch (await InternetDbService(client: client)
-        .host(Target.parse(address))) {
+    switch (await InternetDbService(
+      client: client,
+    ).host(Target.parse(address))) {
       case SourceSuccess(:final value):
         stdout.writeln('  ports: ${value.ports}');
         stdout.writeln('  cpes:  ${value.cpes.take(3).toList()}');

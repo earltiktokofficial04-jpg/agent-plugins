@@ -30,22 +30,27 @@ void main() {
     }
 
     List<ThreatFeed> feeds(int count) => [
-          for (var i = 0; i < count; i++)
-            ThreatFeed(
-              id: 'f$i',
-              name: 'Feed $i',
-              url: 'https://feeds.test/$i.txt',
-              severity: FeedSeverity.medium,
-              description: 'x',
-            ),
-        ];
+      for (var i = 0; i < count; i++)
+        ThreatFeed(
+          id: 'f$i',
+          name: 'Feed $i',
+          url: 'https://feeds.test/$i.txt',
+          severity: FeedSeverity.medium,
+          description: 'x',
+        ),
+    ];
 
     http.Client client() => MockClient((request) async {
-          if (request.url.host.contains('feeds.test')) {
-            return http.Response('1.2.3.0/24\n', 200);
-          }
-          return http.Response(jsonEncode({'pulse_info': {'count': 0}}), 200);
-        });
+      if (request.url.host.contains('feeds.test')) {
+        return http.Response('1.2.3.0/24\n', 200);
+      }
+      return http.Response(
+        jsonEncode({
+          'pulse_info': {'count': 0},
+        }),
+        200,
+      );
+    });
 
     test('progress is null before a lookup starts', () {
       final viewModel = build(feeds(3), client());
@@ -90,8 +95,9 @@ void main() {
   });
 
   group('keyless host enrichment runs without a Shodan key', () {
-    testWidgets('ASN and InternetDB render with no key configured',
-        (tester) async {
+    testWidgets('ASN and InternetDB render with no key configured', (
+      tester,
+    ) async {
       // Both are free and keyless, so they must appear on an ordinary scan —
       // not only for users who have paid for Shodan.
       final client = MockClient((request) async {
@@ -206,8 +212,9 @@ void main() {
   });
 
   group('Shodan data the user paid a credit for is rendered', () {
-    testWidgets('reverse hostnames, OS and scan date all reach the screen',
-        (tester) async {
+    testWidgets('reverse hostnames, OS and scan date all reach the screen', (
+      tester,
+    ) async {
       final client = MockClient((request) async {
         if (request.url.host.contains('crt.sh')) {
           return http.Response('[]', 200);

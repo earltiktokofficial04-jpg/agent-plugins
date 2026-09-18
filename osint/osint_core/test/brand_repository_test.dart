@@ -8,26 +8,24 @@ import 'package:test/test.dart';
 /// Builds a DoH service whose answers are decided per (name, type).
 DnsOverHttpsService _dns(
   http.Response Function(String name, String type) respond,
-) =>
-    DnsOverHttpsService(
-      client: MockClient((request) async {
-        final params = request.url.queryParameters;
-        return respond(params['name']!, params['type']!);
-      }),
-    );
+) => DnsOverHttpsService(
+  client: MockClient((request) async {
+    final params = request.url.queryParameters;
+    return respond(params['name']!, params['type']!);
+  }),
+);
 
 http.Response _answer(String name, int type, String data) => http.Response(
-      jsonEncode({
-        'Status': 0,
-        'Answer': [
-          {'name': name, 'type': type, 'TTL': 60, 'data': data},
-        ],
-      }),
-      200,
-    );
+  jsonEncode({
+    'Status': 0,
+    'Answer': [
+      {'name': name, 'type': type, 'TTL': 60, 'data': data},
+    ],
+  }),
+  200,
+);
 
-http.Response get _nxdomain =>
-    http.Response(jsonEncode({'Status': 3}), 200);
+http.Response get _nxdomain => http.Response(jsonEncode({'Status': 3}), 200);
 
 void main() {
   group('BrandRepository', () {
@@ -48,32 +46,33 @@ void main() {
       );
     });
 
-    test('reports a resolving look-alike as registered and actionable',
-        () async {
-      final repository = BrandRepository(
-        dns: _dns((name, type) {
-          if (name == 'exarnple.com') {
-            if (type == '1') return _answer(name, 1, '203.0.113.10');
-            if (type == '15') return _answer(name, 15, '10 mail.evil.test');
-          }
-          return _nxdomain;
-        }),
-      );
+    test(
+      'reports a resolving look-alike as registered and actionable',
+      () async {
+        final repository = BrandRepository(
+          dns: _dns((name, type) {
+            if (name == 'exarnple.com') {
+              if (type == '1') return _answer(name, 1, '203.0.113.10');
+              if (type == '15') return _answer(name, 15, '10 mail.evil.test');
+            }
+            return _nxdomain;
+          }),
+        );
 
-      final report = await repository.sweep('example.com', limit: 400);
-      final hit = report.findings
-          .where((f) => f.candidate.domain == 'exarnple.com')
-          .single;
+        final report = await repository.sweep('example.com', limit: 400);
+        final hit = report.findings
+            .where((f) => f.candidate.domain == 'exarnple.com')
+            .single;
 
-      expect(hit.isRegistered, isTrue);
-      expect(hit.addresses, ['203.0.113.10']);
-      expect(hit.hasMailExchanger, isTrue);
-      expect(hit.isActionable, isTrue);
-      expect(report.actionable, contains(hit));
-    });
+        expect(hit.isRegistered, isTrue);
+        expect(hit.addresses, ['203.0.113.10']);
+        expect(hit.hasMailExchanger, isTrue);
+        expect(hit.isActionable, isTrue);
+        expect(report.actionable, contains(hit));
+      },
+    );
 
-    test('treats a parked domain with only NS records as registered',
-        () async {
+    test('treats a parked domain with only NS records as registered', () async {
       final repository = BrandRepository(
         dns: _dns((name, type) {
           if (name == 'exarnple.com' && type == '2') {
@@ -109,9 +108,7 @@ void main() {
     });
 
     test('excludes unregistered candidates from the findings', () async {
-      final repository = BrandRepository(
-        dns: _dns((_, __) => _nxdomain),
-      );
+      final repository = BrandRepository(dns: _dns((_, __) => _nxdomain));
       final report = await repository.sweep('example.com', limit: 30);
       expect(report.findings, isEmpty);
       expect(report.candidatesGenerated, greaterThan(30));
@@ -150,8 +147,7 @@ void main() {
       expect(progress.last, 7);
     });
 
-    test('sorts actionable findings ahead of merely registered ones',
-        () async {
+    test('sorts actionable findings ahead of merely registered ones', () async {
       final repository = BrandRepository(
         dns: _dns((name, type) {
           // A parked hit that sorts alphabetically first, and a live hit that

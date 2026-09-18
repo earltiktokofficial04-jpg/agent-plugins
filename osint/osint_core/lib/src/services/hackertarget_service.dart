@@ -34,8 +34,9 @@ class HackerTargetService {
 
   /// Hosts known for [domain].
   Future<SourceResult<List<HostRecord>>> hostSearch(String domain) async {
-    final uri = Uri.parse('$baseUrl/hostsearch/')
-        .replace(queryParameters: {'q': domain});
+    final uri = Uri.parse(
+      '$baseUrl/hostsearch/',
+    ).replace(queryParameters: {'q': domain});
     return _csv(uri, (fields) {
       if (fields.length < 2) return null;
       return HostRecord(
@@ -50,8 +51,9 @@ class HackerTargetService {
   /// On shared hosting this returns every unrelated tenant too, so it is
   /// evidence of co-location, never of common ownership.
   Future<SourceResult<List<HostRecord>>> reverseIp(String address) async {
-    final uri = Uri.parse('$baseUrl/reverseiplookup/')
-        .replace(queryParameters: {'q': address});
+    final uri = Uri.parse(
+      '$baseUrl/reverseiplookup/',
+    ).replace(queryParameters: {'q': address});
     return _csv(uri, (fields) {
       final hostname = fields.first.trim().toLowerCase();
       if (hostname.isEmpty) return null;

@@ -11,10 +11,10 @@ import 'package:osint_app/ui/features/threat_intel/view_models/threat_intel_view
 import 'package:osint_core/osint_core.dart';
 
 http.Client _nxdomain() => MockClient(
-      (request) async => request.url.host.contains('crt.sh')
-          ? http.Response('[]', 200)
-          : http.Response(jsonEncode({'Status': 3}), 200),
-    );
+  (request) async => request.url.host.contains('crt.sh')
+      ? http.Response('[]', 200)
+      : http.Response(jsonEncode({'Status': 3}), 200),
+);
 
 BrandViewModel _brandViewModel(http.Client client) {
   final dns = DnsOverHttpsService(client: client);
@@ -28,15 +28,16 @@ BrandViewModel _brandViewModel(http.Client client) {
 }
 
 ReconRepository _reconRepository(http.Client client) => ReconRepository(
-      dns: DnsOverHttpsService(client: client),
-      crtSh: CrtShService(client: client),
-    );
+  dns: DnsOverHttpsService(client: client),
+  crtSh: CrtShService(client: client),
+);
 
 void main() {
   group('ReconViewModel', () {
     test('starts idle', () {
-      final viewModel =
-          ReconViewModel(repository: _reconRepository(_nxdomain()));
+      final viewModel = ReconViewModel(
+        repository: _reconRepository(_nxdomain()),
+      );
       expect(viewModel.status, ScanStatus.idle);
       expect(viewModel.report, isNull);
       expect(viewModel.isBusy, isFalse);
@@ -67,8 +68,9 @@ void main() {
     });
 
     test('produces a report and notifies listeners', () async {
-      final viewModel =
-          ReconViewModel(repository: _reconRepository(_nxdomain()));
+      final viewModel = ReconViewModel(
+        repository: _reconRepository(_nxdomain()),
+      );
       var notifications = 0;
       viewModel.addListener(() => notifications++);
 
@@ -81,8 +83,9 @@ void main() {
     });
 
     test('toggling host enrichment notifies only on a real change', () {
-      final viewModel =
-          ReconViewModel(repository: _reconRepository(_nxdomain()));
+      final viewModel = ReconViewModel(
+        repository: _reconRepository(_nxdomain()),
+      );
       var notifications = 0;
       viewModel.addListener(() => notifications++);
 
@@ -117,9 +120,7 @@ void main() {
 
     test('records the detected target kind for a hash', () async {
       final viewModel = ThreatIntelViewModel(
-        repository: repository(
-          MockClient((_) async => http.Response('', 404)),
-        ),
+        repository: repository(MockClient((_) async => http.Response('', 404))),
       );
       await viewModel.enrich('d41d8cd98f00b204e9800998ecf8427e');
       expect(viewModel.target!.kind, TargetKind.md5);

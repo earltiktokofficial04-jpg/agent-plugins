@@ -74,8 +74,7 @@ abstract final class ThreatFeeds {
     ThreatFeed(
       id: 'emerging_threats',
       name: 'Emerging Threats compromised',
-      url:
-          'https://rules.emergingthreats.net/blockrules/compromised-ips.txt',
+      url: 'https://rules.emergingthreats.net/blockrules/compromised-ips.txt',
       severity: FeedSeverity.medium,
       description: 'Hosts observed compromised and used in attacks.',
     ),
@@ -136,10 +135,7 @@ abstract final class ThreatFeeds {
 
 /// A hit against one feed.
 class FeedHit {
-  const FeedHit({
-    required this.feed,
-    required this.matchedBlock,
-  });
+  const FeedHit({required this.feed, required this.matchedBlock});
 
   final ThreatFeed feed;
 

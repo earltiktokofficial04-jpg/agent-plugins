@@ -15,8 +15,8 @@ class AbuseIpdbService {
     this.baseUrl = 'https://api.abuseipdb.com/api/v2',
     this.timeout = const Duration(seconds: 20),
     this.maxAgeInDays = 90,
-  })  : _keys = keys,
-        _client = client ?? http.Client();
+  }) : _keys = keys,
+       _client = client ?? http.Client();
 
   final ApiKeyProvider _keys;
   final http.Client _client;
@@ -44,16 +44,17 @@ class AbuseIpdbService {
       );
     }
 
-    final uri = Uri.parse('$baseUrl/check').replace(queryParameters: {
-      'ipAddress': target.value,
-      'maxAgeInDays': maxAgeInDays.toString(),
-    });
+    final uri = Uri.parse('$baseUrl/check').replace(
+      queryParameters: {
+        'ipAddress': target.value,
+        'maxAgeInDays': maxAgeInDays.toString(),
+      },
+    );
 
     try {
-      final response = await _client.get(uri, headers: {
-        'Key': key,
-        'Accept': 'application/json',
-      }).timeout(timeout);
+      final response = await _client
+          .get(uri, headers: {'Key': key, 'Accept': 'application/json'})
+          .timeout(timeout);
 
       if (response.statusCode == 401) {
         return const SourceFailure(

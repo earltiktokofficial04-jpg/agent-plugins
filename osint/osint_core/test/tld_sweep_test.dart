@@ -6,14 +6,14 @@ import 'package:osint_core/osint_core.dart';
 import 'package:test/test.dart';
 
 http.Response _answer(String name, int type, String data) => http.Response(
-      jsonEncode({
-        'Status': 0,
-        'Answer': [
-          {'name': name, 'type': type, 'TTL': 60, 'data': data},
-        ],
-      }),
-      200,
-    );
+  jsonEncode({
+    'Status': 0,
+    'Answer': [
+      {'name': name, 'type': type, 'TTL': 60, 'data': data},
+    ],
+  }),
+  200,
+);
 
 http.Response get _nxdomain => http.Response(jsonEncode({'Status': 3}), 200);
 
@@ -57,8 +57,7 @@ void main() {
           client: MockClient((_) async => throw StateError('no network')),
         ),
       );
-      final namespaces =
-          await repository.namespacesFor(SweepBreadth.focused);
+      final namespaces = await repository.namespacesFor(SweepBreadth.focused);
       expect(namespaces, TyposquatGenerator.defaultTlds);
     });
 
@@ -76,14 +75,19 @@ void main() {
         registry: IanaRegistryService(client: client),
       );
 
-      expect(await repository.namespacesFor(SweepBreadth.allTlds),
-          ['com', 'net']);
+      expect(await repository.namespacesFor(SweepBreadth.allTlds), [
+        'com',
+        'net',
+      ]);
       await repository.namespacesFor(SweepBreadth.allTlds);
       expect(fetches, 1, reason: 'the list should be fetched once');
     });
 
     test('returns empty when the registry is unreachable', () async {
-      final repository = _repository(dns: (_, __) => _nxdomain, registryFails: true);
+      final repository = _repository(
+        dns: (_, __) => _nxdomain,
+        registryFails: true,
+      );
       expect(await repository.namespacesFor(SweepBreadth.allTlds), isEmpty);
     });
   });
@@ -135,8 +139,10 @@ void main() {
         },
       );
 
-      final report =
-          await repository.sweep('acme.com', breadth: SweepBreadth.allTlds);
+      final report = await repository.sweep(
+        'acme.com',
+        breadth: SweepBreadth.allTlds,
+      );
 
       final hit = report.findings.single;
       expect(hit.candidate.domain, 'acme.tk');
@@ -149,8 +155,10 @@ void main() {
       final repository = _repository(
         dns: (_, __) => http.Response('rate limited', 429),
       );
-      final report =
-          await repository.sweep('acme.com', breadth: SweepBreadth.allTlds);
+      final report = await repository.sweep(
+        'acme.com',
+        breadth: SweepBreadth.allTlds,
+      );
       expect(report.findings, isEmpty);
       expect(report.candidatesChecked, 3);
     });
@@ -192,10 +200,14 @@ void main() {
 
     test('reports an unreachable namespace registry distinctly', () async {
       // "The list could not be fetched" must not look like "nothing found".
-      final repository =
-          _repository(dns: (_, __) => _nxdomain, registryFails: true);
-      final report =
-          await repository.sweep('acme.com', breadth: SweepBreadth.allTlds);
+      final repository = _repository(
+        dns: (_, __) => _nxdomain,
+        registryFails: true,
+      );
+      final report = await repository.sweep(
+        'acme.com',
+        breadth: SweepBreadth.allTlds,
+      );
       expect(report.notes.single.ok, isFalse);
       expect(report.notes.single.message, contains('could not be fetched'));
     });

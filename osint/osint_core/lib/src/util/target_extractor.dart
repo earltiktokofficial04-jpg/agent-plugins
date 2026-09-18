@@ -23,19 +23,104 @@ class TargetExtractor {
   /// A small offline TLD set: the common generic ones plus the ccTLDs that
   /// appear most in the region this tool is used in.
   static const Set<String> commonTlds = {
-    'com', 'net', 'org', 'edu', 'gov', 'mil', 'int', 'info', 'biz', 'io',
-    'co', 'me', 'app', 'dev', 'xyz', 'top', 'site', 'online', 'shop',
-    'store', 'live', 'cloud', 'ai', 'tech', 'space', 'club', 'work',
-    'my', 'sg', 'id', 'th', 'ph', 'vn', 'bn', 'uk', 'au', 'nz', 'jp',
-    'kr', 'cn', 'hk', 'tw', 'in', 'pk', 'bd', 'lk', 'ru', 'de', 'fr',
-    'nl', 'it', 'es', 'pt', 'pl', 'se', 'no', 'fi', 'dk', 'ch', 'at',
-    'be', 'ie', 'cz', 'gr', 'tr', 'ua', 'ca', 'us', 'mx', 'br', 'ar',
-    'cl', 'za', 'ng', 'ke', 'eg', 'ae', 'sa', 'il', 'tk', 'ml', 'ga',
-    'cf', 'gq', 'cc', 'ws', 'to', 'sh', 'is', 'eu', 'asia', 'pro',
+    'com',
+    'net',
+    'org',
+    'edu',
+    'gov',
+    'mil',
+    'int',
+    'info',
+    'biz',
+    'io',
+    'co',
+    'me',
+    'app',
+    'dev',
+    'xyz',
+    'top',
+    'site',
+    'online',
+    'shop',
+    'store',
+    'live',
+    'cloud',
+    'ai',
+    'tech',
+    'space',
+    'club',
+    'work',
+    'my',
+    'sg',
+    'id',
+    'th',
+    'ph',
+    'vn',
+    'bn',
+    'uk',
+    'au',
+    'nz',
+    'jp',
+    'kr',
+    'cn',
+    'hk',
+    'tw',
+    'in',
+    'pk',
+    'bd',
+    'lk',
+    'ru',
+    'de',
+    'fr',
+    'nl',
+    'it',
+    'es',
+    'pt',
+    'pl',
+    'se',
+    'no',
+    'fi',
+    'dk',
+    'ch',
+    'at',
+    'be',
+    'ie',
+    'cz',
+    'gr',
+    'tr',
+    'ua',
+    'ca',
+    'us',
+    'mx',
+    'br',
+    'ar',
+    'cl',
+    'za',
+    'ng',
+    'ke',
+    'eg',
+    'ae',
+    'sa',
+    'il',
+    'tk',
+    'ml',
+    'ga',
+    'cf',
+    'gq',
+    'cc',
+    'ws',
+    'to',
+    'sh',
+    'is',
+    'eu',
+    'asia',
+    'pro',
   };
 
   static final RegExp _url = RegExp(
-    r'\bhttps?://[^\s<>"' "'" r'\]\[)(,]+',
+    r'\bhttps?://[^\s<>"'
+    "'"
+    r'\]\[)(,]+',
     caseSensitive: false,
   );
 
@@ -63,9 +148,17 @@ class TargetExtractor {
   static String refangText(String input) {
     var text = input;
     const bracketed = [
-      ('[.]', '.'), ('(.)', '.'), ('{.}', '.'), (' [dot] ', '.'),
-      ('[dot]', '.'), ('(dot)', '.'), ('[:]', ':'), ('[://]', '://'),
-      ('[at]', '@'), ('(at)', '@'), (' [@] ', '@'),
+      ('[.]', '.'),
+      ('(.)', '.'),
+      ('{.}', '.'),
+      (' [dot] ', '.'),
+      ('[dot]', '.'),
+      ('(dot)', '.'),
+      ('[:]', ':'),
+      ('[://]', '://'),
+      ('[at]', '@'),
+      ('(at)', '@'),
+      (' [@] ', '@'),
     ];
     for (final (from, to) in bracketed) {
       text = text.replaceAll(from, to);
@@ -85,8 +178,7 @@ class TargetExtractor {
   }
 
   /// True when [text] carried any defanging marker.
-  static bool looksDefanged(String text) =>
-      text != refangText(text);
+  static bool looksDefanged(String text) => text != refangText(text);
 
   /// Extracts every distinct indicator from [text].
   ///
@@ -105,24 +197,19 @@ class TargetExtractor {
     // Spans already claimed by a more specific match, so a URL's host is not
     // reported a second time as a bare domain.
     final claimed = <({int start, int end})>[];
-    bool isClaimed(int start, int end) => claimed.any(
-          (span) => start >= span.start && end <= span.end,
-        );
-    void claim(int start, int end) =>
-        claimed.add((start: start, end: end));
+    bool isClaimed(int start, int end) =>
+        claimed.any((span) => start >= span.start && end <= span.end);
+    void claim(int start, int end) => claimed.add((start: start, end: end));
 
     final found = <String, ExtractedTarget>{};
 
-    void record(
-      String raw,
-      Target target, {
-      bool fromEmail = false,
-    }) {
+    void record(String raw, Target target, {bool fromEmail = false}) {
       if (target.kind == TargetKind.unknown) return;
       final existing = found[target.value];
       if (existing != null) {
-        found[target.value] =
-            existing.copyWith(occurrences: existing.occurrences + 1);
+        found[target.value] = existing.copyWith(
+          occurrences: existing.occurrences + 1,
+        );
         return;
       }
       found[target.value] = ExtractedTarget(
@@ -205,7 +292,8 @@ class TargetExtractor {
     return text;
   }
 
-  static int _rank(ExtractedTarget extracted) => switch (extracted.target.kind) {
+  static int _rank(ExtractedTarget extracted) =>
+      switch (extracted.target.kind) {
         TargetKind.sha256 => 0,
         TargetKind.sha1 => 1,
         TargetKind.md5 => 2,

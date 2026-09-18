@@ -26,13 +26,13 @@ class OtxService {
   /// Looks [target] up and converts pulse membership into a verdict.
   Future<SourceResult<IocVerdict>> lookup(Target target) async {
     final path = switch (target.kind) {
-      TargetKind.domain || TargetKind.url => 'indicators/domain/${target.value}',
+      TargetKind.domain ||
+      TargetKind.url => 'indicators/domain/${target.value}',
       TargetKind.ipv4 => 'indicators/IPv4/${target.value}',
       TargetKind.ipv6 => 'indicators/IPv6/${target.value}',
       TargetKind.md5 ||
       TargetKind.sha1 ||
-      TargetKind.sha256 =>
-        'indicators/file/${target.value}',
+      TargetKind.sha256 => 'indicators/file/${target.value}',
       TargetKind.unknown => null,
     };
     if (path == null) {
@@ -138,18 +138,16 @@ class OtxService {
   /// Passive DNS answers the question active DNS cannot: where did this domain
   /// point *before* today. Coverage on the keyless endpoint is patchy, so an
   /// empty result is common and is reported as empty rather than as an error.
-  Future<SourceResult<List<PassiveDnsRecord>>> passiveDns(
-    Target target,
-  ) async {
+  Future<SourceResult<List<PassiveDnsRecord>>> passiveDns(Target target) async {
     final path = switch (target.kind) {
-      TargetKind.domain || TargetKind.url => 'indicators/domain/${target.value}',
+      TargetKind.domain ||
+      TargetKind.url => 'indicators/domain/${target.value}',
       TargetKind.ipv4 => 'indicators/IPv4/${target.value}',
       TargetKind.unknown ||
       TargetKind.ipv6 ||
       TargetKind.md5 ||
       TargetKind.sha1 ||
-      TargetKind.sha256 =>
-        null,
+      TargetKind.sha256 => null,
     };
     if (path == null) {
       return const SourceEmpty(sourceName, 'Target type not supported');

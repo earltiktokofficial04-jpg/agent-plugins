@@ -58,8 +58,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SelectableText(
               source.signupUrl,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
           ],
         ),
@@ -100,9 +100,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         Text(
                           'Keyless sources',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleSmall
+                          style: Theme.of(context).textTheme.titleSmall
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 6),
@@ -159,8 +157,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     'Keys are stored in the Android keystore and are sent only '
                     'to the source they belong to.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ],

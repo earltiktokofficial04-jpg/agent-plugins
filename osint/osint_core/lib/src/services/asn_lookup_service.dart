@@ -131,7 +131,8 @@ class AsnLookupService {
     String countryCode,
     String registry,
     DateTime? allocated,
-  })? _parseOrigin(String data) {
+  })?
+  _parseOrigin(String data) {
     final fields = _fields(data);
     if (fields.length < 2) return null;
 

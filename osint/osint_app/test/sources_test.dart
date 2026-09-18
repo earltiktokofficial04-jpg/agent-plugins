@@ -69,16 +69,16 @@ http.Client _registryClient({bool suffixesFail = false}) =>
     });
 
 SourcesViewModel _viewModel(http.Client client) => SourcesViewModel(
-      repository: CatalogRepository(
-        registry: IanaRegistryService(client: client),
-        now: () => DateTime.utc(2026, 9, 12),
-      ),
-    );
+  repository: CatalogRepository(
+    registry: IanaRegistryService(client: client),
+    now: () => DateTime.utc(2026, 9, 12),
+  ),
+);
 
 Widget _harness(SourcesViewModel viewModel) => ChangeNotifierProvider.value(
-      value: viewModel,
-      child: const MaterialApp(home: SourcesScreen()),
-    );
+  value: viewModel,
+  child: const MaterialApp(home: SourcesScreen()),
+);
 
 void main() {
   group('SourcesViewModel', () {
@@ -140,8 +140,9 @@ void main() {
       expect(find.text('sweep namespaces'), findsOneWidget);
     });
 
-    testWidgets('traces every count back to the publishing registry',
-        (tester) async {
+    testWidgets('traces every count back to the publishing registry', (
+      tester,
+    ) async {
       final viewModel = _viewModel(_registryClient());
       await tester.pumpWidget(_harness(viewModel));
       await tester.pumpAndSettle();
@@ -158,10 +159,7 @@ void main() {
         300,
         scrollable: find.byType(Scrollable).first,
       );
-      expect(
-        find.textContaining('source: Public Suffix List'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('source: Public Suffix List'), findsOneWidget);
     });
 
     testWidgets('warns when the totals are incomplete', (tester) async {
@@ -169,10 +167,7 @@ void main() {
       await tester.pumpWidget(_harness(viewModel));
       await tester.pumpAndSettle();
 
-      expect(
-        find.textContaining('could not be reached'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('could not be reached'), findsOneWidget);
     });
 
     testWidgets('lists every bundled threat feed', (tester) async {

@@ -6,14 +6,14 @@ import 'package:osint_core/osint_core.dart';
 import 'package:test/test.dart';
 
 http.Response _txt(String value) => http.Response(
-      jsonEncode({
-        'Status': 0,
-        'Answer': [
-          {'name': 'x', 'type': 16, 'TTL': 60, 'data': '"$value"'},
-        ],
-      }),
-      200,
-    );
+  jsonEncode({
+    'Status': 0,
+    'Answer': [
+      {'name': 'x', 'type': 16, 'TTL': 60, 'data': '"$value"'},
+    ],
+  }),
+  200,
+);
 
 http.Response get _nxdomain => http.Response(jsonEncode({'Status': 3}), 200);
 
@@ -94,23 +94,29 @@ void main() {
 
     test('takes the most specific ASN when announcements overlap', () async {
       // Cymru returns several space-separated ASNs for overlapping origins.
-      final service = _asn((name) => name.contains('origin')
-          ? _txt('64512 64513 | 203.0.113.0/24 | MY | apnic | 2020-01-01')
-          : _nxdomain);
+      final service = _asn(
+        (name) => name.contains('origin')
+            ? _txt('64512 64513 | 203.0.113.0/24 | MY | apnic | 2020-01-01')
+            : _nxdomain,
+      );
 
-      final info =
-          (await service.lookup(Target.parse('203.0.113.1'))).valueOrNull!;
+      final info = (await service.lookup(
+        Target.parse('203.0.113.1'),
+      )).valueOrNull!;
       expect(info.asn, 64512);
     });
 
     test('a missing AS name does not fail the lookup', () async {
       // The ASN and prefix are the useful part; the org name is a bonus.
-      final service = _asn((name) => name.contains('origin')
-          ? _txt('64512 | 203.0.113.0/24 | MY | apnic | 2020-01-01')
-          : _nxdomain);
+      final service = _asn(
+        (name) => name.contains('origin')
+            ? _txt('64512 | 203.0.113.0/24 | MY | apnic | 2020-01-01')
+            : _nxdomain,
+      );
 
-      final info =
-          (await service.lookup(Target.parse('203.0.113.1'))).valueOrNull!;
+      final info = (await service.lookup(
+        Target.parse('203.0.113.1'),
+      )).valueOrNull!;
       expect(info.name, isEmpty);
       expect(info.asn, 64512);
       expect(info.label, 'AS64512');
@@ -161,8 +167,9 @@ void main() {
         ),
       );
 
-      final host =
-          (await service.host(Target.parse('45.33.32.156'))).valueOrNull!;
+      final host = (await service.host(
+        Target.parse('45.33.32.156'),
+      )).valueOrNull!;
       expect(host.ports, [22, 80, 123, 31337]);
       expect(host.hostnames, ['scanme.nmap.org']);
       expect(host.cpes, hasLength(1));

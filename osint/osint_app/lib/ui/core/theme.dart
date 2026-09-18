@@ -43,8 +43,8 @@ Color severityColor(IocSeverity severity, ColorScheme scheme) =>
 
 /// A short human label for a severity.
 String severityLabel(IocSeverity severity) => switch (severity) {
-      IocSeverity.malicious => 'Malicious',
-      IocSeverity.suspicious => 'Suspicious',
-      IocSeverity.clean => 'No detections',
-      IocSeverity.unknown => 'Unknown',
-    };
+  IocSeverity.malicious => 'Malicious',
+  IocSeverity.suspicious => 'Suspicious',
+  IocSeverity.clean => 'No detections',
+  IocSeverity.unknown => 'Unknown',
+};

@@ -16,21 +16,64 @@ class TyposquatGenerator {
   /// TLDs that disproportionately host impersonation domains, plus the common
   /// legitimate ones a brand is most likely to be confused with.
   static const List<String> defaultTlds = [
-    'com', 'net', 'org', 'co', 'io', 'app', 'shop', 'online', 'site',
-    'xyz', 'top', 'live', 'info', 'biz', 'cc', 'my', 'com.my',
+    'com',
+    'net',
+    'org',
+    'co',
+    'io',
+    'app',
+    'shop',
+    'online',
+    'site',
+    'xyz',
+    'top',
+    'live',
+    'info',
+    'biz',
+    'cc',
+    'my',
+    'com.my',
   ];
 
   /// Keys physically adjacent on a QWERTY keyboard, used for fat-finger
   /// replacement and insertion mutations.
   static const Map<String, String> _adjacency = {
-    'a': 'qwsz', 'b': 'vghn', 'c': 'xdfv', 'd': 'serfcx', 'e': 'wsdr',
-    'f': 'drtgvc', 'g': 'ftyhbv', 'h': 'gyujnb', 'i': 'ujko', 'j': 'huikmn',
-    'k': 'jiolm', 'l': 'kop', 'm': 'njk', 'n': 'bhjm', 'o': 'iklp',
-    'p': 'ol', 'q': 'wa', 'r': 'edft', 's': 'awedxz', 't': 'rfgy',
-    'u': 'yhji', 'v': 'cfgb', 'w': 'qase', 'x': 'zsdc', 'y': 'tghu',
+    'a': 'qwsz',
+    'b': 'vghn',
+    'c': 'xdfv',
+    'd': 'serfcx',
+    'e': 'wsdr',
+    'f': 'drtgvc',
+    'g': 'ftyhbv',
+    'h': 'gyujnb',
+    'i': 'ujko',
+    'j': 'huikmn',
+    'k': 'jiolm',
+    'l': 'kop',
+    'm': 'njk',
+    'n': 'bhjm',
+    'o': 'iklp',
+    'p': 'ol',
+    'q': 'wa',
+    'r': 'edft',
+    's': 'awedxz',
+    't': 'rfgy',
+    'u': 'yhji',
+    'v': 'cfgb',
+    'w': 'qase',
+    'x': 'zsdc',
+    'y': 'tghu',
     'z': 'asx',
-    '0': 'o9', '1': 'l2', '2': '13', '3': '24', '4': '35',
-    '5': '46', '6': '57', '7': '68', '8': '79', '9': '80',
+    '0': 'o9',
+    '1': 'l2',
+    '2': '13',
+    '3': '24',
+    '4': '35',
+    '5': '46',
+    '6': '57',
+    '7': '68',
+    '8': '79',
+    '9': '80',
   };
 
   /// Characters that render similarly enough to be mistaken at a glance.
@@ -63,9 +106,26 @@ class TyposquatGenerator {
   /// generate nonsense candidates.
   static ({String label, String suffix}) splitDomain(String domain) {
     const twoPartSuffixes = {
-      'co.uk', 'org.uk', 'ac.uk', 'gov.uk', 'com.my', 'net.my', 'org.my',
-      'gov.my', 'edu.my', 'com.au', 'net.au', 'org.au', 'com.sg', 'com.br',
-      'co.jp', 'co.kr', 'co.nz', 'co.za', 'com.cn', 'com.tr',
+      'co.uk',
+      'org.uk',
+      'ac.uk',
+      'gov.uk',
+      'com.my',
+      'net.my',
+      'org.my',
+      'gov.my',
+      'edu.my',
+      'com.au',
+      'net.au',
+      'org.au',
+      'com.sg',
+      'com.br',
+      'co.jp',
+      'co.kr',
+      'co.nz',
+      'co.za',
+      'com.cn',
+      'com.tr',
     };
     final parts = domain.split('.');
     if (parts.length < 2) return (label: domain, suffix: '');
@@ -173,7 +233,8 @@ class TyposquatGenerator {
 
   Iterable<String> _replacements(String label) sync* {
     for (var i = 0; i < label.length; i++) {
-      for (final replacement in _adjacency[label[i]]?.split('') ?? const <String>[]) {
+      for (final replacement
+          in _adjacency[label[i]]?.split('') ?? const <String>[]) {
         yield label.substring(0, i) + replacement + label.substring(i + 1);
       }
     }
@@ -181,7 +242,8 @@ class TyposquatGenerator {
 
   Iterable<String> _insertions(String label) sync* {
     for (var i = 0; i < label.length; i++) {
-      for (final inserted in _adjacency[label[i]]?.split('') ?? const <String>[]) {
+      for (final inserted
+          in _adjacency[label[i]]?.split('') ?? const <String>[]) {
         yield label.substring(0, i) + inserted + label.substring(i);
       }
     }
@@ -236,8 +298,16 @@ class TyposquatGenerator {
   /// Prepends and appends the words impersonation domains most often bolt on.
   Iterable<String> _prefixes(String label) sync* {
     const affixes = [
-      'login', 'secure', 'account', 'verify', 'support', 'my', 'portal',
-      'auth', 'billing', 'update',
+      'login',
+      'secure',
+      'account',
+      'verify',
+      'support',
+      'my',
+      'portal',
+      'auth',
+      'billing',
+      'update',
     ];
     for (final affix in affixes) {
       yield '$affix-$label';

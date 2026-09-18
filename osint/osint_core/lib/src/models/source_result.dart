@@ -13,9 +13,9 @@ sealed class SourceResult<T> {
 
   /// The value on success, or null on any failure.
   T? get valueOrNull => switch (this) {
-        SourceSuccess<T>(:final value) => value,
-        _ => null,
-      };
+    SourceSuccess<T>(:final value) => value,
+    _ => null,
+  };
 }
 
 /// The source answered and returned usable data.

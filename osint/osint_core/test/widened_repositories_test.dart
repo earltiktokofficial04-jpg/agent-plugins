@@ -21,33 +21,33 @@ void main() {
         'cloudflare-dns.com': (_) =>
             http.Response(jsonEncode({'Status': 0, 'Answer': []}), 200),
         'crt.sh': (_) => http.Response(
-              jsonEncode([
-                {
-                  'issuer_name': 'CN=CA',
-                  'common_name': 'example.com',
-                  'name_value': 'example.com\nct-only.example.com',
-                  'not_before': '2026-01-01T00:00:00',
-                  'not_after': '2026-04-01T00:00:00',
-                },
-              ]),
-              200,
-            ),
+          jsonEncode([
+            {
+              'issuer_name': 'CN=CA',
+              'common_name': 'example.com',
+              'name_value': 'example.com\nct-only.example.com',
+              'not_before': '2026-01-01T00:00:00',
+              'not_after': '2026-04-01T00:00:00',
+            },
+          ]),
+          200,
+        ),
         'api.hackertarget.com': (_) => http.Response(
-              'ht-only.example.com,1.2.3.4\nexample.com,1.2.3.4\n',
-              200,
-            ),
+          'ht-only.example.com,1.2.3.4\nexample.com,1.2.3.4\n',
+          200,
+        ),
         'otx.alienvault.com': (_) => http.Response(
-              jsonEncode({
-                'passive_dns': [
-                  {
-                    'hostname': 'passive-only.example.com',
-                    'address': '203.0.113.1',
-                    'record_type': 'A',
-                  },
-                ],
-              }),
-              200,
-            ),
+          jsonEncode({
+            'passive_dns': [
+              {
+                'hostname': 'passive-only.example.com',
+                'address': '203.0.113.1',
+                'record_type': 'A',
+              },
+            ],
+          }),
+          200,
+        ),
       });
 
       final repository = ReconRepository(
@@ -83,11 +83,11 @@ void main() {
             http.Response(jsonEncode({'Status': 0, 'Answer': []}), 200),
         'crt.sh': (_) => http.Response('[]', 200),
         'api.hackertarget.com': (_) => http.Response(
-              'good.example.com,1.2.3.4\n'
-              'unrelated.org,1.2.3.4\n'
-              'notexample.com,1.2.3.4\n',
-              200,
-            ),
+          'good.example.com,1.2.3.4\n'
+          'unrelated.org,1.2.3.4\n'
+          'notexample.com,1.2.3.4\n',
+          200,
+        ),
       });
 
       final repository = ReconRepository(
@@ -130,12 +130,12 @@ void main() {
             http.Response(jsonEncode({'Status': 0, 'Answer': []}), 200),
         'crt.sh': (_) => http.Response('[]', 200),
         'web.archive.org': (_) => http.Response(
-              jsonEncode([
-                ['original', 'timestamp', 'statuscode', 'mimetype'],
-                ['http://example.com/.env', '20230101000000', '200', 'text/plain'],
-              ]),
-              200,
-            ),
+          jsonEncode([
+            ['original', 'timestamp', 'statuscode', 'mimetype'],
+            ['http://example.com/.env', '20230101000000', '200', 'text/plain'],
+          ]),
+          200,
+        ),
       });
 
       final repository = ReconRepository(
@@ -174,23 +174,29 @@ void main() {
       );
 
       final client = _router({
-        'otx.alienvault.com': (_) =>
-            http.Response(jsonEncode({'pulse_info': {'count': 0}}), 200),
+        'otx.alienvault.com': (_) => http.Response(
+          jsonEncode({
+            'pulse_info': {'count': 0},
+          }),
+          200,
+        ),
         'feeds.test': (_) => http.Response('1.2.3.0/24\n', 200),
       });
 
-      final result = await build(client, feeds: const [feed])
-          .enrich(Target.parse('1.2.3.4'));
+      final result = await build(
+        client,
+        feeds: const [feed],
+      ).enrich(Target.parse('1.2.3.4'));
 
-      final feedVerdict = result.report.verdicts
-          .firstWhere((verdict) => verdict.source == 'Public blocklists');
+      final feedVerdict = result.report.verdicts.firstWhere(
+        (verdict) => verdict.source == 'Public blocklists',
+      );
       expect(feedVerdict.severity, IocSeverity.malicious);
       expect(result.report.worstSeverity, IocSeverity.malicious);
       expect(result.blocklist!.hits, hasLength(1));
     });
 
-    test('a contextual-only hit does not raise the overall severity',
-        () async {
+    test('a contextual-only hit does not raise the overall severity', () async {
       const feed = ThreatFeed(
         id: 'tor',
         name: 'Tor exits',
@@ -200,13 +206,19 @@ void main() {
       );
 
       final client = _router({
-        'otx.alienvault.com': (_) =>
-            http.Response(jsonEncode({'pulse_info': {'count': 0}}), 200),
+        'otx.alienvault.com': (_) => http.Response(
+          jsonEncode({
+            'pulse_info': {'count': 0},
+          }),
+          200,
+        ),
         'feeds.test': (_) => http.Response('1.2.3.4\n', 200),
       });
 
-      final result = await build(client, feeds: const [feed])
-          .enrich(Target.parse('1.2.3.4'));
+      final result = await build(
+        client,
+        feeds: const [feed],
+      ).enrich(Target.parse('1.2.3.4'));
 
       expect(result.report.worstSeverity, IocSeverity.clean);
       expect(result.blocklist!.hits, hasLength(1));
@@ -227,8 +239,10 @@ void main() {
         'feeds.test': (_) => http.Response('', 503),
       });
 
-      final result = await build(client, feeds: const [feed])
-          .enrich(Target.parse('1.2.3.4'));
+      final result = await build(
+        client,
+        feeds: const [feed],
+      ).enrich(Target.parse('1.2.3.4'));
 
       expect(
         result.report.verdicts.where((v) => v.source == 'Public blocklists'),
@@ -248,18 +262,22 @@ void main() {
       );
 
       final client = _router({
-        'otx.alienvault.com': (_) =>
-            http.Response(jsonEncode({'pulse_info': {'count': 0}}), 200),
+        'otx.alienvault.com': (_) => http.Response(
+          jsonEncode({
+            'pulse_info': {'count': 0},
+          }),
+          200,
+        ),
         'feeds.test': (_) {
           feedFetches++;
           return http.Response('1.2.3.0/24\n', 200);
         },
       });
 
-      final result = await build(client, feeds: const [feed]).enrich(
-        Target.parse('1.2.3.4'),
-        checkBlocklists: false,
-      );
+      final result = await build(
+        client,
+        feeds: const [feed],
+      ).enrich(Target.parse('1.2.3.4'), checkBlocklists: false);
 
       expect(feedFetches, 0);
       expect(result.blocklist, isNull);
@@ -278,16 +296,22 @@ void main() {
       );
 
       final client = _router({
-        'otx.alienvault.com': (_) =>
-            http.Response(jsonEncode({'pulse_info': {'count': 0}}), 200),
+        'otx.alienvault.com': (_) => http.Response(
+          jsonEncode({
+            'pulse_info': {'count': 0},
+          }),
+          200,
+        ),
         'feeds.test': (_) {
           feedFetches++;
           return http.Response('1.2.3.0/24\n', 200);
         },
       });
 
-      final result = await build(client, feeds: const [feed])
-          .enrich(Target.parse('example.com'));
+      final result = await build(
+        client,
+        feeds: const [feed],
+      ).enrich(Target.parse('example.com'));
 
       expect(result.blocklist, isNull);
       expect(feedFetches, 0, reason: 'no pointless download for a domain');
@@ -295,16 +319,16 @@ void main() {
 
     test('includes the OTX verdict for a domain', () async {
       final client = _router({
-        'otx.alienvault.com': (_) =>
-            http.Response(jsonEncode({'pulse_info': {'count': 9}}), 200),
+        'otx.alienvault.com': (_) => http.Response(
+          jsonEncode({
+            'pulse_info': {'count': 9},
+          }),
+          200,
+        ),
       });
 
-      final result =
-          await build(client).enrich(Target.parse('evil.example'));
-      expect(
-        result.report.verdicts.single.source,
-        'AlienVault OTX',
-      );
+      final result = await build(client).enrich(Target.parse('evil.example'));
+      expect(result.report.verdicts.single.source, 'AlienVault OTX');
       expect(result.report.worstSeverity, IocSeverity.malicious);
     });
   });

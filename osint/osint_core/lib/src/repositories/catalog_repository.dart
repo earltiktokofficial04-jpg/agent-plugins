@@ -15,10 +15,10 @@ class CatalogRepository {
     List<ThreatFeed> feeds = ThreatFeeds.all,
     int handWrittenApiCount = defaultApiCount,
     DateTime Function() now = DateTime.now,
-  })  : _registry = registry,
-        _feeds = feeds,
-        _apiCount = handWrittenApiCount,
-        _now = now;
+  }) : _registry = registry,
+       _feeds = feeds,
+       _apiCount = handWrittenApiCount,
+       _now = now;
 
   final IanaRegistryService _registry;
   final List<ThreatFeed> _feeds;
@@ -39,9 +39,7 @@ class CatalogRepository {
   /// A registry that fails contributes a zero-count section flagged [stale]
   /// rather than aborting the load: a catalogue missing one section is far
   /// more useful than no catalogue, provided the gap is visible.
-  Future<SourceCatalog> load({
-    void Function(String stage)? onProgress,
-  }) async {
+  Future<SourceCatalog> load({void Function(String stage)? onProgress}) async {
     onProgress?.call('Fetching IANA RDAP bootstrap');
     final rdapResult = await _registry.rdapBootstrap();
 
@@ -66,8 +64,8 @@ class CatalogRepository {
         detail: bootstrap == null
             ? _failureDetail(rdapResult)
             : 'Authoritative for ${bootstrap.tldCount} TLDs. Each is run by '
-                'the registry itself, so a lookup goes to the operator rather '
-                'than a middleman.',
+                  'the registry itself, so a lookup goes to the operator rather '
+                  'than a middleman.',
         stale: bootstrap == null,
       ),
     );
@@ -82,7 +80,7 @@ class CatalogRepository {
         detail: ctLogs == null
             ? _failureDetail(ctResult)
             : 'Across ${ctLogs.map((log) => log.operator).toSet().length} '
-                'operators. Queried in aggregate through crt.sh.',
+                  'operators. Queried in aggregate through crt.sh.',
         stale: ctLogs == null,
       ),
     );
@@ -117,7 +115,7 @@ class CatalogRepository {
         detail: suffixes == null
             ? _failureDetail(suffixResult)
             : 'Every namespace a domain can be registered under, and so every '
-                'namespace a brand can be squatted in.',
+                  'namespace a brand can be squatted in.',
         stale: suffixes == null,
       ),
     );

@@ -29,10 +29,10 @@ class ThreatIntelRepository {
     required AbuseIpdbService abuseIpdb,
     OtxService? otx,
     BlocklistRepository? blocklists,
-  })  : _virusTotal = virusTotal,
-        _abuseIpdb = abuseIpdb,
-        _otx = otx,
-        _blocklists = blocklists;
+  }) : _virusTotal = virusTotal,
+       _abuseIpdb = abuseIpdb,
+       _otx = otx,
+       _blocklists = blocklists;
 
   final VirusTotalService _virusTotal;
   final AbuseIpdbService _abuseIpdb;
@@ -58,9 +58,11 @@ class ThreatIntelRepository {
     // would attach an inapplicable report to the result rather than a useful
     // one. The target type decides, not the caller.
     final blocklistFuture =
-        (checkBlocklists && blocklists != null && target.kind == TargetKind.ipv4)
-            ? blocklists.check(target, onProgress: onFeedProgress)
-            : null;
+        (checkBlocklists &&
+            blocklists != null &&
+            target.kind == TargetKind.ipv4)
+        ? blocklists.check(target, onProgress: onFeedProgress)
+        : null;
 
     final results = await Future.wait([
       _virusTotal.lookup(target),

@@ -60,13 +60,13 @@ class _BrandScreenState extends State<BrandScreen> {
         Text(
           viewModel.mode == SweepMode.typosquat
               ? 'Misspells the brand name and keeps the suffix: '
-                  'exarnple.com, exampel.com.'
+                    'exarnple.com, exampel.com.'
               : 'Keeps the brand name and varies the suffix: example.tk, '
-                  'example.com.my. Namespace lists come from IANA and the '
-                  'Public Suffix List.',
+                    'example.com.my. Namespace lists come from IANA and the '
+                    'Public Suffix List.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         if (viewModel.mode == SweepMode.namespace) ...[
           const SizedBox(height: 12),
@@ -117,8 +117,8 @@ class _BrandScreenState extends State<BrandScreen> {
           'Each candidate costs one or two DNS lookups. Higher limits find '
           'more, and take longer on mobile data.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         if (viewModel.isBusy) ...[
           const SizedBox(height: 16),
@@ -134,10 +134,9 @@ class _BrandScreenState extends State<BrandScreen> {
             padding: const EdgeInsets.only(top: 12),
             child: Text(
               viewModel.rejection,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: Theme.of(context).colorScheme.error),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+              ),
             ),
           ),
         if (viewModel.status == ScanStatus.idle)
@@ -166,19 +165,24 @@ class _BrandScreenState extends State<BrandScreen> {
               label: 'Generated',
               value: '${report.candidatesGenerated}',
             ),
+            KeyValueRow(label: 'Checked', value: '${report.candidatesChecked}'),
             KeyValueRow(
-              label: 'Checked',
-              value: '${report.candidatesChecked}',
+              label: 'Registered',
+              value: '${report.findings.length}',
             ),
-            KeyValueRow(label: 'Registered', value: '${report.findings.length}'),
-            KeyValueRow(label: 'Actionable', value: '${report.actionable.length}'),
+            KeyValueRow(
+              label: 'Actionable',
+              value: '${report.actionable.length}',
+            ),
           ],
         ),
       ),
       if (report.findings.isEmpty)
         const SectionCard(
           title: 'Findings',
-          child: Text('No registered look-alikes among the candidates checked.'),
+          child: Text(
+            'No registered look-alikes among the candidates checked.',
+          ),
         ),
       for (final finding in report.findings)
         Card(
@@ -201,8 +205,7 @@ class _BrandScreenState extends State<BrandScreen> {
                       Chip(
                         label: const Text('Live'),
                         visualDensity: VisualDensity.compact,
-                        backgroundColor:
-                            theme.colorScheme.errorContainer,
+                        backgroundColor: theme.colorScheme.errorContainer,
                         labelStyle: theme.textTheme.labelSmall?.copyWith(
                           color: theme.colorScheme.onErrorContainer,
                           fontWeight: FontWeight.w700,

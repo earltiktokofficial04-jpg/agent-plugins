@@ -21,8 +21,11 @@ void main() {
     });
 
     test('marks a failure as not ok and carries the key flag', () {
-      const result =
-          SourceFailure<int>('VirusTotal', 'no key', needsApiKey: true);
+      const result = SourceFailure<int>(
+        'VirusTotal',
+        'no key',
+        needsApiKey: true,
+      );
       final note = SourceNote.from(result);
       expect(note.ok, isFalse);
       expect(note.needsApiKey, isTrue);
@@ -78,42 +81,24 @@ void main() {
     });
   });
 
-  group('DueDiligenceReport.mailPosture', () {
-    test('detects SPF and DMARC from TXT records', () {
+  group('DueDiligenceReport.mailSecurity', () {
+    test('carries the mail posture the service produced', () {
+      // The judgement itself lives in MailSecurityService and is tested
+      // there; the report only has to carry it through intact.
       final report = DueDiligenceReport(
         target: Target.parse('example.com'),
-        dnsRecords: [
-          _record(DnsRecordType.mx, '10 mail.example.com'),
-          _record(DnsRecordType.txt, 'v=spf1 include:_spf.example.com ~all'),
-          _record(DnsRecordType.txt, 'v=DMARC1; p=reject'),
-        ],
+        mailSecurity: const MailSecurityPosture(
+          domain: 'example.com',
+          mailExchangers: ['mail.example.com'],
+        ),
       );
-      final posture = report.mailPosture;
-      expect(posture.hasMx, isTrue);
-      expect(posture.hasSpf, isTrue);
-      expect(posture.hasDmarc, isTrue);
-      expect(posture.sendsMailUnauthenticated, isFalse);
+      expect(report.mailSecurity!.acceptsMail, isTrue);
+      expect(report.mailSecurity!.isSpoofable, isTrue);
     });
 
-    test('flags a mail-accepting domain with no SPF', () {
-      final report = DueDiligenceReport(
-        target: Target.parse('example.com'),
-        dnsRecords: [
-          _record(DnsRecordType.mx, '10 mail.example.com'),
-          _record(DnsRecordType.txt, 'some-unrelated-verification-token'),
-        ],
-      );
-      expect(report.mailPosture.sendsMailUnauthenticated, isTrue);
-      expect(report.mailPosture.hasDmarc, isFalse);
-    });
-
-    test('does not flag a domain that accepts no mail at all', () {
-      final report = DueDiligenceReport(
-        target: Target.parse('example.com'),
-        dnsRecords: [_record(DnsRecordType.a, '1.2.3.4')],
-      );
-      expect(report.mailPosture.hasMx, isFalse);
-      expect(report.mailPosture.sendsMailUnauthenticated, isFalse);
+    test('a null posture means not evaluated, not "no protection"', () {
+      final report = DueDiligenceReport(target: Target.parse('example.com'));
+      expect(report.mailSecurity, isNull);
     });
   });
 

@@ -9,18 +9,17 @@ List<String> _values(List<ExtractedTarget> found) =>
 void main() {
   group('refangText', () {
     test('undoes the bracket conventions threat reports use', () {
-      expect(
-        TargetExtractor.refangText('evil[.]com'),
-        'evil.com',
-      );
+      expect(TargetExtractor.refangText('evil[.]com'), 'evil.com');
       expect(
         TargetExtractor.refangText('hxxps://evil[.]com/path'),
         'https://evil.com/path',
       );
       expect(TargetExtractor.refangText('192.168.1[.]1'), '192.168.1.1');
       expect(TargetExtractor.refangText('user[at]evil[.]com'), 'user@evil.com');
-      expect(TargetExtractor.refangText('hxxp[://]evil(.)com'),
-          'http://evil.com');
+      expect(
+        TargetExtractor.refangText('hxxp[://]evil(.)com'),
+        'http://evil.com',
+      );
     });
 
     test('leaves ordinary text untouched', () {
@@ -36,8 +35,9 @@ void main() {
 
   group('fromText — what it finds', () {
     test('extracts a plain domain', () {
-      expect(_values(extractor.fromText('go to example.com now')),
-          ['example.com']);
+      expect(_values(extractor.fromText('go to example.com now')), [
+        'example.com',
+      ]);
     });
 
     test('extracts a URL and does not also report its host separately', () {
@@ -50,8 +50,9 @@ void main() {
     });
 
     test('extracts IPv4 addresses', () {
-      expect(_values(extractor.fromText('connect to 203.0.113.7 please')),
-          ['203.0.113.7']);
+      expect(_values(extractor.fromText('connect to 203.0.113.7 please')), [
+        '203.0.113.7',
+      ]);
     });
 
     test('extracts hashes of each supported length', () {
@@ -61,10 +62,11 @@ void main() {
         'sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
       );
       expect(found, hasLength(3));
-      expect(
-        found.map((e) => e.target.kind).toSet(),
-        {TargetKind.md5, TargetKind.sha1, TargetKind.sha256},
-      );
+      expect(found.map((e) => e.target.kind).toSet(), {
+        TargetKind.md5,
+        TargetKind.sha1,
+        TargetKind.sha256,
+      });
     });
 
     test('takes the domain from an email address and flags it', () {
@@ -80,16 +82,14 @@ void main() {
         'IOCs: hxxps://login-mybank[.]tk/verify , C2 at 185.220.101[.]5 , '
         'sender phish[at]login-mybank[.]tk',
       );
-      expect(
-        _values(found),
-        containsAll(['login-mybank.tk', '185.220.101.5']),
-      );
+      expect(_values(found), containsAll(['login-mybank.tk', '185.220.101.5']));
       expect(found.every((e) => e.wasDefanged), isTrue);
     });
 
     test('counts repeats instead of listing duplicates', () {
-      final found = extractor
-          .fromText('evil.com talked to evil.com and then evil.com again');
+      final found = extractor.fromText(
+        'evil.com talked to evil.com and then evil.com again',
+      );
       expect(found, hasLength(1));
       expect(found.single.occurrences, 3);
     });
@@ -106,10 +106,11 @@ void main() {
       final found = extractor.fromText(
         'example.com 203.0.113.7 d41d8cd98f00b204e9800998ecf8427e',
       );
-      expect(
-        found.map((e) => e.target.kind).toList(),
-        [TargetKind.md5, TargetKind.ipv4, TargetKind.domain],
-      );
+      expect(found.map((e) => e.target.kind).toList(), [
+        TargetKind.md5,
+        TargetKind.ipv4,
+        TargetKind.domain,
+      ]);
     });
   });
 
@@ -171,8 +172,9 @@ void main() {
     });
 
     test('the bundled set covers the local ccTLDs', () {
-      expect(_values(extractor.fromText('wzbgroup.com.my')),
-          ['wzbgroup.com.my']);
+      expect(_values(extractor.fromText('wzbgroup.com.my')), [
+        'wzbgroup.com.my',
+      ]);
       expect(_values(extractor.fromText('example.my')), ['example.my']);
     });
   });

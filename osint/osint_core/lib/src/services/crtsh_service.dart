@@ -27,9 +27,9 @@ class CrtShService {
   ///
   /// The `%.` wildcard asks crt.sh for subdomain matches as well as the apex.
   Future<SourceResult<List<CtCertificate>>> certificates(String domain) async {
-    final uri = Uri.parse(baseUrl).replace(
-      queryParameters: {'q': '%.$domain', 'output': 'json'},
-    );
+    final uri = Uri.parse(
+      baseUrl,
+    ).replace(queryParameters: {'q': '%.$domain', 'output': 'json'});
 
     try {
       final response = await _client

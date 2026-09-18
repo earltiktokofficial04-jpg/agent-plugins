@@ -28,7 +28,9 @@ class Target {
       kind == TargetKind.sha1 ||
       kind == TargetKind.sha256;
 
-  static final RegExp _ipv4 = RegExp(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$');
+  static final RegExp _ipv4 = RegExp(
+    r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$',
+  );
   static final RegExp _hex = RegExp(r'^[0-9a-f]+$');
   static final RegExp _domain = RegExp(
     r'^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$',
@@ -72,7 +74,9 @@ class Target {
       }
     }
 
-    final host = lower.endsWith('.') ? lower.substring(0, lower.length - 1) : lower;
+    final host = lower.endsWith('.')
+        ? lower.substring(0, lower.length - 1)
+        : lower;
     if (_domain.hasMatch(host)) {
       return Target._(trimmed, host, TargetKind.domain);
     }
