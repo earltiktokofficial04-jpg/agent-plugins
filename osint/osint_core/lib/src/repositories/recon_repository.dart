@@ -1,6 +1,7 @@
 import '../models/certificate.dart';
 import '../models/dns_record.dart';
 import '../models/reports.dart';
+import '../models/source_result.dart';
 import '../models/target.dart';
 import '../services/asn_lookup_service.dart';
 import '../services/crtsh_service.dart';
@@ -93,23 +94,15 @@ class ReconRepository {
     final passiveFuture = _otx?.passiveDns(target);
     final archiveFuture = _wayback?.urlsFor(target.value);
 
-    final dnsRecords = await dnsFuture;
+    final dnsResult = await dnsFuture;
+    final dnsRecords = dnsResult.valueOrNull ?? const <DnsRecord>[];
     final certResult = await certFuture;
     notes.add(SourceNote.from(certResult));
 
-    if (dnsRecords.isEmpty) {
-      notes.add(
-        const SourceNote(
-          source: DnsOverHttpsService.sourceName,
-          ok: true,
-          message: 'No records resolved',
-        ),
-      );
-    } else {
-      notes.add(
-        const SourceNote(source: DnsOverHttpsService.sourceName, ok: true),
-      );
-    }
+    // Taken from the result, not inferred from an empty list: a resolver
+    // outage and a domain with no records produce the same empty list and
+    // could not mean more different things.
+    notes.add(SourceNote.from(dnsResult));
 
     final certificates = certResult.valueOrNull ?? const <CtCertificate>[];
     final hosts = <String>{
@@ -204,6 +197,6 @@ class ReconRepository {
     );
   }
 
-  Future<List<DnsRecord>> _resolveApex(String domain) =>
+  Future<SourceResult<List<DnsRecord>>> _resolveApex(String domain) =>
       _dns.resolveAll(domain, apexRecordTypes);
 }

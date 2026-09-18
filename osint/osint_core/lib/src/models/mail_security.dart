@@ -91,6 +91,9 @@ class DmarcRecord {
   bool get isPartiallyApplied => percentage < 100;
 }
 
+/// One of the record lookups a full posture depends on.
+enum MailCheck { spf, dmarc, mtaSts, dane }
+
 /// How badly a domain's mail authentication is set up.
 enum MailFindingSeverity { high, medium, low }
 
@@ -117,6 +120,7 @@ class MailSecurityPosture {
     this.hasMtaSts = false,
     this.mtaStsRecord = '',
     this.hasDane = false,
+    this.unresolved = const {},
   });
 
   final String domain;
@@ -131,6 +135,17 @@ class MailSecurityPosture {
   /// DANE TLSA records on the mail exchangers.
   final bool hasDane;
 
+  /// Checks whose lookup failed rather than came back empty.
+  ///
+  /// The distinction is the whole point: a rate-limited DMARC query and a
+  /// domain with no DMARC record look identical in the data and could not be
+  /// more different in meaning. An unresolved check produces no finding, so a
+  /// resolver problem never manufactures a security finding.
+  final Set<MailCheck> unresolved;
+
+  /// True when [check] could not be evaluated.
+  bool isUnresolved(MailCheck check) => unresolved.contains(check);
+
   bool get acceptsMail => mailExchangers.isNotEmpty;
 
   /// Everything wrong with this domain's mail setup, worst first.
@@ -141,7 +156,7 @@ class MailSecurityPosture {
     final found = <MailFinding>[];
 
     final spfRecord = spf;
-    if (spfRecord == null) {
+    if (spfRecord == null && !isUnresolved(MailCheck.spf)) {
       found.add(
         MailFinding(
           title: 'No SPF record',
@@ -153,7 +168,7 @@ class MailSecurityPosture {
           severity: MailFindingSeverity.high,
         ),
       );
-    } else {
+    } else if (spfRecord != null) {
       if (spfRecord.authorisesEveryone) {
         found.add(
           const MailFinding(
@@ -202,7 +217,7 @@ class MailSecurityPosture {
     }
 
     final dmarcRecord = dmarc;
-    if (dmarcRecord == null) {
+    if (dmarcRecord == null && !isUnresolved(MailCheck.dmarc)) {
       found.add(
         const MailFinding(
           title: 'No DMARC record',
@@ -212,7 +227,7 @@ class MailSecurityPosture {
           severity: MailFindingSeverity.high,
         ),
       );
-    } else {
+    } else if (dmarcRecord != null) {
       if (dmarcRecord.isMonitoringOnly) {
         found.add(
           const MailFinding(
@@ -260,7 +275,12 @@ class MailSecurityPosture {
       }
     }
 
-    if (acceptsMail && !hasMtaSts && !hasDane) {
+    // Only claim a downgrade risk when both transport checks actually ran.
+    if (acceptsMail &&
+        !hasMtaSts &&
+        !hasDane &&
+        !isUnresolved(MailCheck.mtaSts) &&
+        !isUnresolved(MailCheck.dane)) {
       found.add(
         const MailFinding(
           title: 'Inbound mail can be downgraded',
@@ -282,8 +302,17 @@ class MailSecurityPosture {
     return found;
   }
 
+  /// True when a check could not be completed, so the picture is partial.
+  bool get isIncomplete => unresolved.isNotEmpty;
+
   /// True when nothing stops a stranger sending mail as this domain.
+  ///
+  /// Returns false when SPF or DMARC could not be resolved: an unknown
+  /// posture must not be reported as a confirmed weakness.
   bool get isSpoofable {
+    if (isUnresolved(MailCheck.spf) || isUnresolved(MailCheck.dmarc)) {
+      return false;
+    }
     final spfRecord = spf;
     final dmarcRecord = dmarc;
     final spfStops =

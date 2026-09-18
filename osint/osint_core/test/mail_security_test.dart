@@ -340,6 +340,111 @@ void main() {
       },
     );
 
+    test(
+      'a failed DMARC lookup is not reported as "no DMARC record"',
+      () async {
+        // The distinction this whole engine turns on, in the module most likely
+        // to get it wrong: a rate-limited _dmarc query and a domain with no
+        // DMARC record are identical in the data and opposite in meaning.
+        final service = MailSecurityService(
+          dns: DnsOverHttpsService(
+            client: MockClient((request) async {
+              final name = request.url.queryParameters['name']!;
+              if (name.startsWith('_dmarc.')) {
+                return http.Response('', 503);
+              }
+              if (request.url.queryParameters['type'] == '16') {
+                return http.Response(
+                  jsonEncode({
+                    'Status': 0,
+                    'Answer': [
+                      {
+                        'name': name,
+                        'type': 16,
+                        'TTL': 60,
+                        'data': 'v=spf1 -all',
+                      },
+                    ],
+                  }),
+                  200,
+                );
+              }
+              return http.Response(jsonEncode({'Status': 3}), 200);
+            }),
+          ),
+        );
+
+        final posture = (await service.evaluate(
+          Target.parse('example.com'),
+        )).valueOrNull!;
+
+        expect(posture.isUnresolved(MailCheck.dmarc), isTrue);
+        expect(posture.isIncomplete, isTrue);
+        expect(
+          posture.findings.any((f) => f.title == 'No DMARC record'),
+          isFalse,
+          reason: 'an outage must not manufacture a security finding',
+        );
+        // An unknown DMARC means spoofability cannot be asserted either.
+        expect(posture.isSpoofable, isFalse);
+      },
+    );
+
+    test('a failed TLSA lookup is not reported as a downgrade risk', () async {
+      final service = MailSecurityService(
+        dns: DnsOverHttpsService(
+          client: MockClient((request) async {
+            final params = request.url.queryParameters;
+            if (params['type'] == '52') return http.Response('', 503);
+            if (params['type'] == '15') {
+              return http.Response(
+                jsonEncode({
+                  'Status': 0,
+                  'Answer': [
+                    {
+                      'name': 'example.com',
+                      'type': 15,
+                      'TTL': 60,
+                      'data': '10 mail.example.com.',
+                    },
+                  ],
+                }),
+                200,
+              );
+            }
+            return http.Response(jsonEncode({'Status': 3}), 200);
+          }),
+        ),
+      );
+
+      final posture = (await service.evaluate(
+        Target.parse('example.com'),
+      )).valueOrNull!;
+
+      expect(posture.isUnresolved(MailCheck.dane), isTrue);
+      expect(
+        posture.findings.any((f) => f.title.contains('downgraded')),
+        isFalse,
+      );
+    });
+
+    test('an empty DMARC answer IS reported as no record', () async {
+      // The other half of the distinction: NXDOMAIN really does mean absent.
+      final posture = await _evaluate({
+        'example.com|$_txt': ['v=spf1 -all'],
+      });
+      expect(posture.isUnresolved(MailCheck.dmarc), isFalse);
+      expect(posture.findings.any((f) => f.title == 'No DMARC record'), isTrue);
+    });
+
+    test('a domain with no MX leaves DANE resolved, not unknown', () async {
+      // Nothing to query is not the same as querying and failing.
+      final posture = await _evaluate({
+        'example.com|$_txt': ['v=spf1 -all'],
+      });
+      expect(posture.isUnresolved(MailCheck.dane), isFalse);
+    });
+
     test('declines a non-domain target', () async {
       final result = await _service({}).evaluate(Target.parse('8.8.8.8'));
       expect(result, isA<SourceEmpty<MailSecurityPosture>>());

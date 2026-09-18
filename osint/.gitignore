@@ -1,0 +1,6 @@
+# The repo root ignores pubspec.lock, which is right for the library packages
+# under tool/ but wrong here. osint_app is an application: without its lock
+# file, CI resolves dependencies fresh on every run and builds a version set
+# nobody tested. osint_core is locked with it so the two stay consistent.
+!pubspec.lock
+!**/pubspec.lock

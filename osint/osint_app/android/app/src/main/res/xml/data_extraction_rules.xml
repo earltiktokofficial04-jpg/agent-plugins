@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Backup and device-to-device transfer are both disabled outright.
+
+  API keys live in EncryptedSharedPreferences, whose master key is held in the
+  Android Keystore. Keystore material is never included in a backup, so a
+  restored device would receive ciphertext it can never decrypt — the app
+  would report the keys as configured while every lookup failed with an auth
+  error, which is the most confusing failure available.
+
+  Backing up user-supplied credentials off the device is also not something to
+  do by default.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

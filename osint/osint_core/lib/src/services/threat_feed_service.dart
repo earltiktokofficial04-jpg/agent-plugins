@@ -46,6 +46,10 @@ class ThreatFeedService {
 
   final Map<String, LoadedFeed> _cache = {};
 
+  /// Below this, a body is a header comment or an error page rather than a
+  /// feed whose format we failed to read.
+  static const int _minMeaningfulBytes = 512;
+
   /// Feeds currently held in cache.
   Iterable<LoadedFeed> get cached => _cache.values;
 
@@ -76,8 +80,18 @@ class ThreatFeedService {
         const LineSplitter().convert(decodeBodyLeniently(response)),
       );
       if (blocks.isEmpty) {
-        // Several of these feeds legitimately empty out when the threat they
-        // track goes quiet, which is a finding rather than a fault.
+        // Several feeds legitimately empty out when the threat they track
+        // goes quiet — but a feed that served real bytes we could not parse
+        // is a broken integration, not an empty list, and must not be
+        // counted as a clean search of that source.
+        final hadContent = response.bodyBytes.length > _minMeaningfulBytes;
+        if (hadContent) {
+          return SourceFailure(
+            feed.name,
+            'Downloaded ${response.bodyBytes.length} bytes but parsed no '
+            'entries — the feed format has probably changed',
+          );
+        }
         return SourceEmpty(feed.name, 'Feed is currently empty');
       }
 

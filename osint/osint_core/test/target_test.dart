@@ -21,6 +21,26 @@ void main() {
       expect(target.value, 'shop.example.com');
     });
 
+    test('a URL pointing at an IP is classified as that IP', () {
+      // Left as a URL, every IP-only source declines it and a hostile
+      // address comes back reported as present in no source at all.
+      final v4 = Target.parse('http://185.220.101.5/payload');
+      expect(v4.kind, TargetKind.ipv4);
+      expect(v4.value, '185.220.101.5');
+      expect(v4.isIp, isTrue);
+
+      final v6 = Target.parse('https://[2001:4860:4860::8888]/x');
+      expect(v6.kind, TargetKind.ipv6);
+      expect(v6.value, '2001:4860:4860::8888');
+    });
+
+    test('a URL pointing at a hostname stays a URL', () {
+      expect(
+        Target.parse('https://shop.example.com/cart').kind,
+        TargetKind.url,
+      );
+    });
+
     test('classifies IPv4 and rejects out-of-range octets', () {
       expect(Target.parse('8.8.8.8').kind, TargetKind.ipv4);
       expect(Target.parse('256.1.1.1').kind, isNot(TargetKind.ipv4));

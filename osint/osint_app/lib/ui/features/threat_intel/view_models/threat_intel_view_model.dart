@@ -51,6 +51,31 @@ class ThreatIntelViewModel extends ChangeNotifier {
 
   bool get isBusy => _status == ScanStatus.running;
 
+  int _generation = 0;
+  bool _disposed = false;
+
+  /// Starts a new request and returns its generation token.
+  ///
+  /// A second request can arrive while the first is still in flight — the
+  /// image scanner hands a target straight to a view model that may already
+  /// be busy — and without this the slower response overwrites the newer one,
+  /// so the screen shows results for a target the user has moved on from.
+  int _beginRequest() => ++_generation;
+
+  /// True when [generation] is still the request the user is waiting for.
+  bool _isCurrent(int generation) => !_disposed && generation == _generation;
+
+  /// Notifies only while this view model is still mounted.
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
   /// Enriches [input], which may be a domain, IP, URL or file hash.
   Future<void> enrich(String input) async {
     _lastInput = input.trim();
@@ -60,7 +85,7 @@ class ThreatIntelViewModel extends ChangeNotifier {
       _rejection =
           'Enter a domain, IP address, URL, or an MD5, SHA-1 or SHA-256 hash.';
       _result = null;
-      notifyListeners();
+      _notify();
       return;
     }
 
@@ -69,19 +94,22 @@ class ThreatIntelViewModel extends ChangeNotifier {
     _rejection = '';
     _feedsLoaded = 0;
     _feedsTotal = 0;
-    notifyListeners();
+    final generation = _beginRequest();
+    _notify();
 
     final result = await _repository.enrich(
       target,
       onFeedProgress: (loaded, total) {
+        if (!_isCurrent(generation)) return;
         _feedsLoaded = loaded;
         _feedsTotal = total;
-        notifyListeners();
+        _notify();
       },
     );
+    if (!_isCurrent(generation)) return;
 
     _result = result;
     _status = ScanStatus.done;
-    notifyListeners();
+    _notify();
   }
 }

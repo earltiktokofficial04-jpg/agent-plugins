@@ -55,6 +55,17 @@ class Target {
       final uri = Uri.tryParse(lower);
       final host = uri?.host ?? '';
       if (host.isNotEmpty) {
+        // A URL pointing straight at an address is an IP indicator. Left as
+        // TargetKind.url it would be declined by AbuseIPDB, Shodan, the ASN
+        // lookup and every blocklist, and a hostile address would come back
+        // reported as present in no source at all.
+        if (_isIpv4(host)) return Target._(trimmed, host, TargetKind.ipv4);
+        final bracketless = host.startsWith('[') && host.endsWith(']')
+            ? host.substring(1, host.length - 1)
+            : host;
+        if (_isIpv6(bracketless)) {
+          return Target._(trimmed, bracketless, TargetKind.ipv6);
+        }
         return Target._(trimmed, host, TargetKind.url);
       }
       return Target._(trimmed, lower, TargetKind.unknown);

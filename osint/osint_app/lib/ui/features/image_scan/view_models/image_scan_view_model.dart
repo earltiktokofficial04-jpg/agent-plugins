@@ -44,6 +44,31 @@ class ImageScanViewModel extends ChangeNotifier {
 
   bool get isBusy => _status == ScanStatus.running;
 
+  int _generation = 0;
+  bool _disposed = false;
+
+  /// Starts a new request and returns its generation token.
+  ///
+  /// A second request can arrive while the first is still in flight — the
+  /// image scanner hands a target straight to a view model that may already
+  /// be busy — and without this the slower response overwrites the newer one,
+  /// so the screen shows results for a target the user has moved on from.
+  int _beginRequest() => ++_generation;
+
+  /// True when [generation] is still the request the user is waiting for.
+  bool _isCurrent(int generation) => !_disposed && generation == _generation;
+
+  /// Notifies only while this view model is still mounted.
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
   /// Fetches the live TLD list so filename false positives are suppressed.
   ///
   /// Failure is silent by design: the bundled list keeps the feature usable,
@@ -57,31 +82,35 @@ class ImageScanViewModel extends ChangeNotifier {
     if (tlds == null || tlds.isEmpty) return;
     _extractor = TargetExtractor(knownTlds: tlds.toSet());
     _tldsLoaded = true;
-    notifyListeners();
+    _notify();
   }
 
   /// Reads an image from [source] and extracts every indicator in it.
   Future<void> scanImage(ImageSource2 source) async {
+    final generation = _beginRequest();
     _status = ScanStatus.running;
     _message = '';
-    notifyListeners();
+    _notify();
 
     final ImageReadout? readout;
     try {
       readout = await _scanner.readImage(source);
     } catch (error) {
+      if (!_isCurrent(generation)) return;
       _status = ScanStatus.rejected;
       _message = 'Could not read the image: $error';
       _found = const [];
       _readout = null;
-      notifyListeners();
+      _notify();
       return;
     }
+
+    if (!_isCurrent(generation)) return;
 
     if (readout == null) {
       // Cancelled at the picker — not a failure, and not worth an error.
       _status = _found.isEmpty ? ScanStatus.idle : ScanStatus.done;
-      notifyListeners();
+      _notify();
       return;
     }
 
@@ -95,7 +124,7 @@ class ImageScanViewModel extends ChangeNotifier {
           : 'Text was read, but no domain, address or hash was found in it.';
     }
 
-    notifyListeners();
+    _notify();
   }
 
   /// Clears the current result.
@@ -104,6 +133,6 @@ class ImageScanViewModel extends ChangeNotifier {
     _readout = null;
     _message = '';
     _status = ScanStatus.idle;
-    notifyListeners();
+    _notify();
   }
 }

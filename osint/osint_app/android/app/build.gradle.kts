@@ -31,9 +31,20 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // Signing with the debug key so `flutter build apk --release` and
+            // CI both work unattended. Replace with a real keystore before
+            // distributing: a debug-signed APK cannot be published, and every
+            // machine's debug key differs, so updates would not install over
+            // each other.
             signingConfig = signingConfigs.getByName("debug")
+
+            // R8 needs the rules in proguard-rules.pro: the ML Kit text
+            // plugin references recogniser classes for scripts this app does
+            // not depend on, and without them the release build fails.
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }

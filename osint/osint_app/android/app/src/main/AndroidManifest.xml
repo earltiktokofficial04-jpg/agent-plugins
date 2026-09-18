@@ -4,15 +4,20 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
-    <!-- Scanning a QR code or photographing a report needs the camera.
-         Declared optional so the app still installs on camera-less devices,
-         where the gallery picker remains available. -->
-    <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- No CAMERA permission on purpose. image_picker hands off to the
+         system camera app via ACTION_IMAGE_CAPTURE, which needs none — but
+         Android makes the permission MANDATORY for that intent as soon as an
+         app declares it. Declaring it without also requesting it at runtime
+         is strictly worse than not declaring it: the camera path fails on
+         Android 6 and later. -->
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <application
         android:label="OSINT"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -40,9 +45,6 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-        <meta-data
-            android:name="com.google.mlkit.vision.DEPENDENCIES"
-            android:value="ocr,barcode" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

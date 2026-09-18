@@ -80,6 +80,10 @@ class DnsOverHttpsService {
         final code = answer['type'];
         final recordType = code is int ? DnsRecordType.fromCode(code) : null;
         if (recordType == null) continue;
+        // Resolvers return the whole chain: an A query for a CNAME'd host
+        // answers with the CNAME *and* the final A. Keeping both would report
+        // the CNAME target as if it were an address.
+        if (recordType != type) continue;
         records.add(
           DnsRecord(
             name: (answer['name'] as String?) ?? name,
@@ -102,28 +106,46 @@ class DnsOverHttpsService {
     }
   }
 
-  /// Resolves several record types concurrently and flattens the successes.
+  /// Resolves several record types concurrently.
   ///
-  /// Per-type failures are dropped rather than propagated: a domain with no
-  /// MX records should still report its A records.
-  Future<List<DnsRecord>> resolveAll(
+  /// Returns a [SourceResult] rather than a bare list so a caller cannot
+  /// mistake "the resolver is down" for "this domain has no records" — the
+  /// two are identical in a flattened list and opposite in meaning.
+  ///
+  /// Success when any type returned records; empty when every type answered
+  /// but none held any; failure only when every lookup failed.
+  Future<SourceResult<List<DnsRecord>>> resolveAll(
     String name,
     List<DnsRecordType> types,
   ) async {
-    final results = await Future.wait(types.map((type) => resolve(name, type)));
-    return [for (final result in results) ...?result.valueOrNull];
-  }
+    if (types.isEmpty) return const SourceEmpty(sourceName, 'No types asked');
 
-  /// True when [name] has any record suggesting it is registered and live.
-  ///
-  /// Checks A, then NS, then MX, stopping at the first hit to keep the number
-  /// of requests down when sweeping hundreds of typosquat candidates.
-  Future<bool> hasAnyRecord(String name) async {
-    for (final type in [DnsRecordType.a, DnsRecordType.ns, DnsRecordType.mx]) {
-      final result = await resolve(name, type);
-      if (result is SourceSuccess<List<DnsRecord>>) return true;
+    final results = await Future.wait(types.map((type) => resolve(name, type)));
+
+    final records = <DnsRecord>[];
+    var anyAnswered = false;
+    String? firstFailure;
+
+    for (final result in results) {
+      switch (result) {
+        case SourceSuccess(:final value):
+          anyAnswered = true;
+          records.addAll(value);
+        case SourceEmpty():
+          anyAnswered = true;
+        case SourceFailure(:final message):
+          firstFailure ??= message;
+      }
     }
-    return false;
+
+    if (records.isNotEmpty) return SourceSuccess(sourceName, records);
+    if (anyAnswered) {
+      return const SourceEmpty(sourceName, 'No records of any queried type');
+    }
+    return SourceFailure(
+      sourceName,
+      'Every lookup failed: ${firstFailure ?? 'unknown error'}',
+    );
   }
 
   /// TXT records arrive wrapped in quotes; strip one balanced pair.

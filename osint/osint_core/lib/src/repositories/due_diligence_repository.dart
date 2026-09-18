@@ -58,7 +58,8 @@ class DueDiligenceRepository {
     final mailFuture = _mailSecurity?.evaluate(target);
 
     final rdapResult = await rdapFuture;
-    final dnsRecords = await dnsFuture;
+    final dnsResult = await dnsFuture;
+    final dnsRecords = dnsResult.valueOrNull ?? const <DnsRecord>[];
     final certResult = await certFuture;
     final mailResult = await mailFuture;
 
@@ -75,11 +76,7 @@ class DueDiligenceRepository {
       ).length,
       notes: [
         SourceNote.from(rdapResult),
-        SourceNote(
-          source: DnsOverHttpsService.sourceName,
-          ok: true,
-          message: dnsRecords.isEmpty ? 'No records resolved' : '',
-        ),
+        SourceNote.from(dnsResult),
         SourceNote.from(certResult),
         if (mailResult != null) SourceNote.from(mailResult),
       ],

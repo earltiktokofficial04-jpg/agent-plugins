@@ -135,6 +135,142 @@ void main() {
       expect(result, isA<SourceEmpty<List<DnsRecord>>>());
     });
 
+    test('returns only the record type that was queried', () async {
+      // A resolver answers an A query for a CNAME'd host with the CNAME AND
+      // the final A. Keeping both would report the CNAME target as an
+      // address — verified against the real resolver: an A query for
+      // www.github.com answers with "github.com." (type 5) and 140.82.112.4.
+      final service = DnsOverHttpsService(
+        client: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'Status': 0,
+              'Answer': [
+                {
+                  'name': 'www.example.com',
+                  'type': 5,
+                  'TTL': 60,
+                  'data': 'example.com.',
+                },
+                {
+                  'name': 'example.com',
+                  'type': 1,
+                  'TTL': 60,
+                  'data': '140.82.112.4',
+                },
+              ],
+            }),
+            200,
+          ),
+        ),
+      );
+
+      final records = (await service.resolve(
+        'www.example.com',
+        DnsRecordType.a,
+      )).valueOrNull!;
+      expect(records, hasLength(1));
+      expect(records.single.type, DnsRecordType.a);
+      expect(records.single.data, '140.82.112.4');
+    });
+
+    test(
+      'a CNAME-only answer to an A query is empty, not a false address',
+      () async {
+        final service = DnsOverHttpsService(
+          client: MockClient(
+            (_) async => http.Response(
+              jsonEncode({
+                'Status': 0,
+                'Answer': [
+                  {
+                    'name': 'www.example.com',
+                    'type': 5,
+                    'TTL': 60,
+                    'data': 'target.example.net.',
+                  },
+                ],
+              }),
+              200,
+            ),
+          ),
+        );
+
+        expect(
+          await service.resolve('www.example.com', DnsRecordType.a),
+          isA<SourceEmpty<List<DnsRecord>>>(),
+        );
+      },
+    );
+
+    test('resolveAll fails when every lookup failed', () async {
+      // The invariant the whole engine turns on. A flattened list cannot
+      // express the difference between "the resolver is down" and "this
+      // domain publishes nothing", so resolveAll must.
+      final service = DnsOverHttpsService(
+        client: MockClient((_) async => http.Response('', 503)),
+      );
+
+      final result = await service.resolveAll('example.com', [
+        DnsRecordType.a,
+        DnsRecordType.mx,
+      ]);
+      expect(result, isA<SourceFailure<List<DnsRecord>>>());
+      expect(
+        (result as SourceFailure<List<DnsRecord>>).message,
+        contains('Every lookup failed'),
+      );
+    });
+
+    test(
+      'resolveAll is empty when every lookup answered with nothing',
+      () async {
+        final service = DnsOverHttpsService(
+          client: MockClient(
+            (_) async => http.Response(jsonEncode({'Status': 3}), 200),
+          ),
+        );
+
+        final result = await service.resolveAll('example.com', [
+          DnsRecordType.a,
+          DnsRecordType.mx,
+        ]);
+        expect(result, isA<SourceEmpty<List<DnsRecord>>>());
+      },
+    );
+
+    test('resolveAll succeeds on a partial answer', () async {
+      // One dead record type must not discard the others.
+      final service = DnsOverHttpsService(
+        client: MockClient((request) async {
+          if (request.url.queryParameters['type'] == '15') {
+            return http.Response('', 500);
+          }
+          return http.Response(
+            jsonEncode({
+              'Status': 0,
+              'Answer': [
+                {
+                  'name': 'example.com',
+                  'type': 1,
+                  'TTL': 60,
+                  'data': '1.2.3.4',
+                },
+              ],
+            }),
+            200,
+          );
+        }),
+      );
+
+      final result = await service.resolveAll('example.com', [
+        DnsRecordType.a,
+        DnsRecordType.mx,
+      ]);
+      expect(result, isA<SourceSuccess<List<DnsRecord>>>());
+      expect(result.valueOrNull, hasLength(1));
+    });
+
     test('resolveAll flattens successes and drops failures', () async {
       final service = DnsOverHttpsService(
         client: MockClient((request) async {
@@ -152,10 +288,11 @@ void main() {
         }),
       );
 
-      final records = await service.resolveAll('example.com', [
+      final result = await service.resolveAll('example.com', [
         DnsRecordType.a,
         DnsRecordType.mx,
       ]);
+      final records = result.valueOrNull!;
       expect(records, hasLength(1));
       expect(records.single.data, '1.2.3.4');
     });

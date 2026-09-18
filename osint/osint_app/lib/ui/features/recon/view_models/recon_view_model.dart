@@ -33,11 +33,36 @@ class ReconViewModel extends ChangeNotifier {
 
   bool get isBusy => _status == ScanStatus.running;
 
+  int _generation = 0;
+  bool _disposed = false;
+
+  /// Starts a new request and returns its generation token.
+  ///
+  /// A second request can arrive while the first is still in flight — the
+  /// image scanner hands a target straight to a view model that may already
+  /// be busy — and without this the slower response overwrites the newer one,
+  /// so the screen shows results for a target the user has moved on from.
+  int _beginRequest() => ++_generation;
+
+  /// True when [generation] is still the request the user is waiting for.
+  bool _isCurrent(int generation) => !_disposed && generation == _generation;
+
+  /// Notifies only while this view model is still mounted.
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
   /// Whether to spend Shodan credits enriching resolved addresses.
   void setEnrichHosts(bool value) {
     if (_enrichHosts == value) return;
     _enrichHosts = value;
-    notifyListeners();
+    _notify();
   }
 
   /// Scans [input], which must parse to a domain.
@@ -50,18 +75,20 @@ class ReconViewModel extends ChangeNotifier {
           'Enter a domain such as example.com. Recon needs a domain, not an '
           'IP address or a hash.';
       _report = null;
-      notifyListeners();
+      _notify();
       return;
     }
 
+    final generation = _beginRequest();
     _status = ScanStatus.running;
     _rejection = '';
-    notifyListeners();
+    _notify();
 
     final report = await _repository.scan(target, enrichHosts: _enrichHosts);
+    if (!_isCurrent(generation)) return;
 
     _report = report;
     _status = ScanStatus.done;
-    notifyListeners();
+    _notify();
   }
 }

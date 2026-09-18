@@ -27,6 +27,31 @@ class DueDiligenceViewModel extends ChangeNotifier {
 
   bool get isBusy => _status == ScanStatus.running;
 
+  int _generation = 0;
+  bool _disposed = false;
+
+  /// Starts a new request and returns its generation token.
+  ///
+  /// A second request can arrive while the first is still in flight — the
+  /// image scanner hands a target straight to a view model that may already
+  /// be busy — and without this the slower response overwrites the newer one,
+  /// so the screen shows results for a target the user has moved on from.
+  int _beginRequest() => ++_generation;
+
+  /// True when [generation] is still the request the user is waiting for.
+  bool _isCurrent(int generation) => !_disposed && generation == _generation;
+
+  /// Notifies only while this view model is still mounted.
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
   /// Age of the registration, or null when it is unknown.
   Duration? get registrationAge => _report?.registration?.ageAt(_now());
 
@@ -46,18 +71,20 @@ class DueDiligenceViewModel extends ChangeNotifier {
       _status = ScanStatus.rejected;
       _rejection = 'Enter the organisation\'s domain, such as example.com.';
       _report = null;
-      notifyListeners();
+      _notify();
       return;
     }
 
+    final generation = _beginRequest();
     _status = ScanStatus.running;
     _rejection = '';
-    notifyListeners();
+    _notify();
 
     final report = await _repository.profile(target);
+    if (!_isCurrent(generation)) return;
 
     _report = report;
     _status = ScanStatus.done;
-    notifyListeners();
+    _notify();
   }
 }

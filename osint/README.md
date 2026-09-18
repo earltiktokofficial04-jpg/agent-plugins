@@ -113,8 +113,8 @@ authorised to assess, brand impersonation, and counterparty checks.
 
 ```
 osint/
-├── osint_core/     Pure Dart. Every source, model and repository. 228 tests.
-└── osint_app/      Flutter Android UI. MVVM over osint_core. 56 tests.
+├── osint_core/     Pure Dart. Every source, model and repository. 266 tests.
+└── osint_app/      Flutter Android UI. MVVM over osint_core. 59 tests.
 ```
 
 `osint_core` has no Flutter dependency, so it runs under plain `dart test` and
@@ -133,6 +133,7 @@ models, view models hold UI state as `ChangeNotifier`s, and views only render.
 |---|---|
 | DNS-over-HTTPS (Cloudflare) | A/AAAA/NS/MX/TXT/SOA/CAA/CNAME |
 | Team Cymru (over the same DoH) | IP-to-ASN, BGP prefix, allocating registry |
+| DNS (SPF, DMARC, MTA-STS, DANE) | Mail-authentication posture — no extra source needed |
 | Shodan InternetDB | Open ports, software fingerprints and CVE leads — no key, no credit |
 | crt.sh | Certificate history, host discovery |
 | RDAP (rdap.org) | Registration, registrar, dates, DNSSEC |
@@ -166,7 +167,7 @@ flutter run
 flutter build apk --release
 ```
 
-Tests — 284 in total, none of which touch the network:
+Tests — 325 in total, none of which touch the network:
 
 ```bash
 cd osint/osint_core && dart test
@@ -181,6 +182,26 @@ cd osint/osint_core
 dart run example/live_smoke.dart anthropic.com
 dart run example/catalog_count.dart
 ```
+
+## CI
+
+`.github/workflows/osint.yaml` runs on every push, not only to main: the point
+is that work in progress builds too. Four jobs — osint_core analyzed,
+format-checked and tested on Linux, macOS and Windows; a coverage gate at 85%
+(currently 91.9%); osint_app analyzed, format-checked and tested; and release
+APKs built per ABI and uploaded.
+
+The APK job is not ceremony. Passing `flutter test` says nothing about whether
+the Android half assembles, and the first release build attempted here failed
+outright: R8 could not resolve the Chinese, Devanagari, Japanese and Korean
+text-recogniser classes that the ML Kit plugin references from a single method,
+none of which this app depends on. Debug builds skip R8, so nothing before that
+point would have caught it. `android/app/proguard-rules.pro` silences those
+three references and keeps the ML Kit entry points, which are loaded
+reflectively.
+
+Per-ABI splitting matters here too: a universal APK carrying the OCR and
+barcode models for every architecture is ~96MB, against 29–41MB per ABI.
 
 ## Design notes
 

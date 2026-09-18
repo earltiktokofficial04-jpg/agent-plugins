@@ -50,6 +50,19 @@ class MailSecurityService {
       );
     }
 
+    // A lookup that FAILED is recorded as unresolved so no finding is made
+    // from it; a lookup that came back EMPTY is a real absence.
+    final unresolved = <MailCheck>{};
+    if (txtResult is SourceFailure<List<DnsRecord>>) {
+      unresolved.add(MailCheck.spf);
+    }
+    if (dmarcResult is SourceFailure<List<DnsRecord>>) {
+      unresolved.add(MailCheck.dmarc);
+    }
+    if (mtaStsResult is SourceFailure<List<DnsRecord>>) {
+      unresolved.add(MailCheck.mtaSts);
+    }
+
     final mailExchangers = [
       for (final record in mxResult.valueOrNull ?? const <DnsRecord>[])
         _hostFromMx(record.data),
@@ -67,7 +80,8 @@ class MailSecurityService {
       'v=stsv1',
     );
 
-    final hasDane = await _hasDane(mailExchangers);
+    final dane = await _hasDane(mailExchangers);
+    if (!dane.resolved) unresolved.add(MailCheck.dane);
 
     return SourceSuccess(
       sourceName,
@@ -78,7 +92,8 @@ class MailSecurityService {
         dmarc: dmarc,
         hasMtaSts: mtaStsRecord.isNotEmpty,
         mtaStsRecord: mtaStsRecord,
-        hasDane: hasDane,
+        hasDane: dane.found,
+        unresolved: unresolved,
       ),
     );
   }
@@ -238,16 +253,28 @@ class MailSecurityService {
     );
   }
 
-  /// True when any mail exchanger publishes a TLSA record for SMTP.
+  /// Whether any mail exchanger publishes a TLSA record for SMTP, and whether
+  /// the question could be answered at all.
   ///
-  /// Only the first few are checked: DANE is configured per-host, but a domain
-  /// that has it on its primary MX has it, and querying twenty exchangers to
-  /// answer a yes/no question is not worth the requests.
-  Future<bool> _hasDane(List<String> mailExchangers) async {
+  /// Only the first few exchangers are checked: DANE is configured per-host,
+  /// but a domain that has it on its primary MX has it, and querying twenty
+  /// hosts to answer a yes/no question is not worth the requests.
+  ///
+  /// `resolved` is false when every lookup failed, so a resolver problem is
+  /// never reported as "this domain has no DANE".
+  Future<({bool found, bool resolved})> _hasDane(
+    List<String> mailExchangers,
+  ) async {
+    if (mailExchangers.isEmpty) return (found: false, resolved: true);
+
+    var anyAnswered = false;
     for (final host in mailExchangers.take(3)) {
       final result = await _dns.resolve('_25._tcp.$host', DnsRecordType.tlsa);
-      if (result is SourceSuccess<List<DnsRecord>>) return true;
+      if (result is SourceSuccess<List<DnsRecord>>) {
+        return (found: true, resolved: true);
+      }
+      if (result is SourceEmpty<List<DnsRecord>>) anyAnswered = true;
     }
-    return false;
+    return (found: false, resolved: anyAnswered);
   }
 }

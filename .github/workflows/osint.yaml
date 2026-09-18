@@ -120,6 +120,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          # Without this, Gradle re-downloads the Android toolchain and every
+          # dependency on each run — several minutes and a couple of GB.
+          cache: gradle
 
       - uses: subosito/flutter-action@v2
         with:
@@ -128,16 +131,19 @@ jobs:
 
       - run: flutter pub get
 
-      - name: Build release APK
-        run: flutter build apk --release
+      # Split per ABI. A universal APK carrying the ML Kit OCR and barcode
+      # models for every architecture comes to ~96MB; per-ABI builds are about
+      # a third of that, and a device only ever needs one.
+      - name: Build release APKs
+        run: flutter build apk --release --split-per-abi
 
-      - name: Report APK size
-        run: ls -lh build/app/outputs/flutter-apk/app-release.apk
+      - name: Report APK sizes
+        run: ls -lh build/app/outputs/flutter-apk/*.apk
 
-      - name: Upload APK
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: osint-app-release-apk
-          path: osint/osint_app/build/app/outputs/flutter-apk/app-release.apk
+          name: osint-app-release-apks
+          path: osint/osint_app/build/app/outputs/flutter-apk/*-release.apk
           if-no-files-found: error
           retention-days: 30

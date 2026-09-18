@@ -37,14 +37,14 @@ class BrandViewModel extends ChangeNotifier {
   void setMode(SweepMode value) {
     if (_mode == value) return;
     _mode = value;
-    notifyListeners();
+    _notify();
   }
 
   /// How far a namespace sweep should reach.
   void setBreadth(SweepBreadth value) {
     if (_breadth == value) return;
     _breadth = value;
-    notifyListeners();
+    _notify();
   }
 
   ScanStatus _status = ScanStatus.idle;
@@ -73,6 +73,31 @@ class BrandViewModel extends ChangeNotifier {
 
   bool get isBusy => _status == ScanStatus.running;
 
+  int _generation = 0;
+  bool _disposed = false;
+
+  /// Starts a new request and returns its generation token.
+  ///
+  /// A second request can arrive while the first is still in flight — the
+  /// image scanner hands a target straight to a view model that may already
+  /// be busy — and without this the slower response overwrites the newer one,
+  /// so the screen shows results for a target the user has moved on from.
+  int _beginRequest() => ++_generation;
+
+  /// True when [generation] is still the request the user is waiting for.
+  bool _isCurrent(int generation) => !_disposed && generation == _generation;
+
+  /// Notifies only while this view model is still mounted.
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
   /// Fraction complete, or null before a sweep starts.
   double? get progress =>
       _total == 0 ? null : (_checked / _total).clamp(0.0, 1.0);
@@ -80,7 +105,7 @@ class BrandViewModel extends ChangeNotifier {
   void setLimit(int value) {
     if (_limit == value) return;
     _limit = value;
-    notifyListeners();
+    _notify();
   }
 
   /// Counts the candidates for [input] without making any request.
@@ -102,7 +127,7 @@ class BrandViewModel extends ChangeNotifier {
       _status = ScanStatus.rejected;
       _rejection = 'Enter the brand domain to protect, such as example.com.';
       _report = null;
-      notifyListeners();
+      _notify();
       return;
     }
 
@@ -110,12 +135,14 @@ class BrandViewModel extends ChangeNotifier {
     _rejection = '';
     _checked = 0;
     _total = 0;
-    notifyListeners();
+    final generation = _beginRequest();
+    _notify();
 
     void progress(int checked, int total) {
+      if (!_isCurrent(generation)) return;
       _checked = checked;
       _total = total;
-      notifyListeners();
+      _notify();
     }
 
     final report = switch (_mode) {
@@ -131,10 +158,11 @@ class BrandViewModel extends ChangeNotifier {
         onProgress: progress,
       ),
     };
+    if (!_isCurrent(generation)) return;
 
     _report = report;
     _status = ScanStatus.done;
-    notifyListeners();
+    _notify();
   }
 
   /// How many namespaces the selected breadth covers, for the UI to show

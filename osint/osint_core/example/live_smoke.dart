@@ -27,12 +27,13 @@ Future<void> main(List<String> args) async {
   final crtSh = CrtShService(client: client);
 
   stdout.writeln('== DNS ==');
-  final records = await dns.resolveAll(domain, [
+  final dnsResult = await dns.resolveAll(domain, [
     DnsRecordType.a,
     DnsRecordType.ns,
     DnsRecordType.mx,
     DnsRecordType.txt,
   ]);
+  final records = dnsResult.valueOrNull ?? const <DnsRecord>[];
   if (records.isEmpty) {
     stdout.writeln('  (nothing resolved)');
   }
